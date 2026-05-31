@@ -397,7 +397,7 @@ async function fetchWithProxy(url){
 // ── FinMind API token（混淆存放，非真正加密）────────────────────────
 const _p1="ZXlKMGVYQWlPaUpLVjFRaUxDSmhiR2NpT2lKSVV6STFOaUo5LmV5SjFjMlZ5";
 const _p2="WDJsa0lqb2lUV2x1Ym1sbFpXbHVibWxOSWl3aVpXMWhhV3dpT2lKaGJtZGxi";
-const _p3="R0V5TWpZMU1ERXdRR2R0WVdsc0xtTnZiU0lzSW5SdmEyVnVYM1psY25OcGIyNGlPakI5LkdpVlRBQVU3SF8wcjZmWmZvbGIwbVhDSmJjbm9TLWlPcEZlb1lOQkhZRTg=";
+const _p3="R0V5TWpZMU1ERXdRR2R0WVdsc0xtTnZiU0lzSW5SdmEyVnVYM1psY25OcGIyNGlPakY5LjZVRjQ4WFRjemN3ZmRHVmItTFd1STJ0MXFJcEJqOTFnOGhWRGRiXzBoeGs=";
 function _tk(){ try{ return atob(_p1+_p2+_p3); }catch(e){ return ""; } }
 
 // ── FinMind：上市 + 上櫃收盤價（有開 CORS，免 proxy）────────────────
@@ -455,7 +455,7 @@ async function fetchPrices(onlyHolding=false){
       });
       twseOk=true;
     }
-  }catch(e){ errors.push("TWSE直連失敗，改走FinMind"); }
+  }catch(e){ errors.push("TWSE上市查詢失敗"); }
 
   // ── 2. 上市殖利率（openapi.twse.com.tw，失敗靜默跳過）──────────────
   try{
@@ -468,30 +468,32 @@ async function fetchPrices(onlyHolding=false){
     });
   }catch(e){}
 
-  // ── 3. 抓不到的 → FinMind（上市直連失敗 or 上櫃股票）────────────
+  // ── 3. 個股在 TWSE 找不到 → 依序用 FinMind 補查 ────────────────
+  // 策略：每支股票在 TWSE 找不到 → 先試上市資料集，再試上櫃資料集
   let finmindCount=0;
 
-  // 3a. TWSE 直連失敗 → 用 FinMind TaiwanStockPrice 補上市股票
-  //     上市股票：4碼純數字 1xxx~5xxx 或 ETF 00xxx
-  if(!twseOk){
-    const twseCodes=tickers.filter(t=>map[t]==null&&(/^\d{4}$/.test(t)||/^00\d+$/.test(t)));
-    if(twseCodes.length){
-      try{
-        const prices=await fetchFinMind("TaiwanStockPrice", twseCodes, dateStr);
-        Object.assign(map, prices);
-        finmindCount+=Object.keys(prices).length;
-      }catch(e){ errors.push("FinMind上市:"+e.message); }
-    }
-  }
+  // 找出在 TWSE 找不到價格的股票
+  const missingFromTWSE=tickers.filter(t=>map[t]==null);
 
-  // 3b. 仍抓不到的 → 用 FinMind TaiwanOTCPrice 查上櫃
-  const stillMissing=tickers.filter(t=>map[t]==null);
-  if(stillMissing.length){
+  if(missingFromTWSE.length){
+    // 3a. 先用 FinMind TaiwanStockPrice（上市）補
     try{
-      const prices=await fetchFinMind("TaiwanOTCPrice", stillMissing, dateStr);
+      const prices=await fetchFinMind("TaiwanStockPrice", missingFromTWSE, dateStr);
       Object.assign(map, prices);
-      finmindCount+=Object.keys(prices).length;
-    }catch(e){ errors.push("FinMind上櫃:"+e.message); }
+      const found=Object.keys(prices).length;
+      if(found) finmindCount+=found;
+    }catch(e){ errors.push("FinMind上市:"+e.message); }
+
+    // 3b. FinMind 上市也找不到 → 再用 TaiwanOTCPrice（上櫃）補
+    const stillMissingOTC=missingFromTWSE.filter(t=>map[t]==null);
+    if(stillMissingOTC.length){
+      try{
+        const prices=await fetchFinMind("TaiwanOTCPrice", stillMissingOTC, dateStr);
+        Object.assign(map, prices);
+        const found=Object.keys(prices).length;
+        if(found) finmindCount+=found;
+      }catch(e){ errors.push("FinMind上櫃:"+e.message); }
+    }
   }
 
   // ── 4. 寫入 state ─────────────────────────────────────────────────
@@ -515,9 +517,9 @@ async function fetchPrices(onlyHolding=false){
     priceMsg="更新失敗："+errors.join("；");
   } else {
     priceMsg=`已更新 ${updated} 檔收盤價`+(yieldUpdated?`、${yieldUpdated} 檔殖利率`:"")
-      +(finmindCount?`（其中 ${finmindCount} 檔走 FinMind）`:"")
+      +(finmindCount?`（其中 ${finmindCount} 檔 TWSE 找不到，改用 FinMind）`:"")
       +(notFound.length?`，找不到：${notFound.join("、")}`:"")
-      +(errors.length?`（部分：${errors.join("；")}）`:"");
+      +(errors.length?`（部分錯誤：${errors.join("；")}）`:"");
   }
   priceLoading=false;render();
 }
