@@ -395,7 +395,8 @@ async function fetchWithProxy(url){
 }
 
 // ── FinMind API token（混淆存放，非真正加密）────────────────────────
-const _p1="ZXlKMGVYQWlPaUpLVjFRaUxDSmhiR2NpT2lKSVV6STFOaUo5LmV5SjFjMlZ5";
+const _p1= "s";
+//const _p1="ZXlKMGVYQWlPaUpLVjFRaUxDSmhiR2NpT2lKSVV6STFOaUo5LmV5SjFjMlZ5";
 const _p2="WDJsa0lqb2lUV2x1Ym1sbFpXbHVibWxOSWl3aVpXMWhhV3dpT2lKaGJtZGxi";
 const _p3="R0V5TWpZMU1ERXdRR2R0WVdsc0xtTnZiU0lzSW5SdmEyVnVYM1psY25OcGIyNGlPakI5LkdpVlRBQVU3SF8wcjZmWmZvbGIwbVhDSmJjbm9TLWlPcEZlb1lOQkhZRTg=";
 function _tk(){ try{ return atob(_p1+_p2+_p3); }catch(e){ return ""; } }
@@ -406,71 +407,95 @@ function _tk(){ try{ return atob(_p1+_p2+_p3); }catch(e){ return ""; } }
 // 一次帶入多個 data_id 用逗號分隔（免費版單次 600 筆上限）
 async function fetchFinMind(dataset, codes, date){
   const token=_tk();
-  const ids=codes.join(",");
-  const url=`https://api.finmindtrade.com/api/v4/data?dataset=${dataset}&data_id=${encodeURIComponent(ids)}&start_date=${date}&token=${token}`;
-  const res=await fetch(url,{credentials:'omit',signal:AbortSignal.timeout(20000)});
-  if(!res.ok) throw new Error(`FinMind HTTP ${res.status}`);
-  const json=await res.json();
-  if(json.status!==200) throw new Error(`FinMind status ${json.status}: ${json.msg||""}`);
-  // json.data = [{date,stock_id,close,...}, ...]
-  // 取每支股票最新一筆
-  const latest={};
-  (json.data||[]).forEach(row=>{
-    const id=(row.stock_id||"").trim();
-    if(!latest[id]||row.date>latest[id].date) latest[id]=row;
-  });
-  const result={};
-  Object.entries(latest).forEach(([id,row])=>{
-    const price=parseFloat(row.close);
-    if(!isNaN(price)) result[id]=price;
-  });
-  return result;
+  // FinMind 每次只帶一個 data_id，用 Promise.all 並行查
+  const results = await Promise.allSettled(codes.map(async code=>{
+    const url=`https://api.finmindtrade.com/api/v4/data?dataset=${dataset}&data_id=${encodeURIComponent(code)}&start_date=${date}&token=${token}`;
+    const res=await fetch(url,{credentials:'omit',signal:AbortSignal.timeout(20000)});
+    if(!res.ok) throw new Error(`FinMind HTTP ${res.status}`);
+    const json=await res.json();
+    if(json.status!==200) throw new Error(`FinMind ${json.msg||json.status}`);
+    // 取最新一筆收盤價
+    const rows=(json.data||[]);
+    if(!rows.length) return null;
+    const latest=rows.reduce((a,b)=>a.date>b.date?a:b);
+    const price=parseFloat(latest.close);
+    return isNaN(price)?null:{code,price};
+  }));
+  const map={};
+  results.forEach(r=>{ if(r.status==='fulfilled'&&r.value) map[r.value.code]=r.value.price; });
+  return map;
 }
 
-async function fetchPrices(){
+
+async function fetchPrices(onlyHolding=false){
   if(priceLoading)return;
   priceLoading=true;priceMsg="";render();
-  const tickers=Object.keys(state.stocks);
+  const allTickers=Object.keys(state.stocks);
+  // 只更新目前有持倉（持股數 > 0）的股票
+  const tickers=onlyHolding
+    ? allTickers.filter(t=>totalShares(t)>0)
+    : allTickers;
   if(!tickers.length){priceLoading=false;priceMsg="尚無持股";render();return;}
 
   const map={};
   const yieldMap={};
   const errors=[];
+  const dateStr=new Date(Date.now()-4*86400000).toISOString().slice(0,10);
 
-  // ── 1. 上市收盤價（openapi.twse.com.tw 有開 CORS，直接呼叫）────────
+  // ── 1. 上市收盤價：www.twse.com.tw（有開 CORS *）────────────────
+  // 欄位順序：[0]代號 [1]名稱 [2]成交股數 [3]成交金額 [4]開盤 [5]最高 [6]最低 [7]收盤 ...
+  let twseOk=false;
   try{
-    const d=await fetch("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL",{credentials:'omit',signal:AbortSignal.timeout(15000)}).then(r=>r.json());
-    if(Array.isArray(d)) d.forEach(row=>{
-      const code=(row.Code||"").trim();
-      const close=parseFloat((row.ClosingPrice||"").replace(/,/g,""));
-      if(code&&!isNaN(close)) map[code]=close;
-    });
-  }catch(e){errors.push("上市收盤:"+e.message);}
+    const d=await fetch("https://www.twse.com.tw/rwd/zh/afterTrading/STOCK_DAY_ALL?response=json",
+      {credentials:'omit',signal:AbortSignal.timeout(12000)}).then(r=>{ if(!r.ok) throw new Error(r.status); return r.json(); });
+    if(d.stat==="OK"&&Array.isArray(d.data)&&d.data.length){
+      d.data.forEach(row=>{
+        const code=(row[0]||"").trim();
+        const close=parseFloat((row[7]||"").replace(/,/g,""));
+        if(code&&!isNaN(close)) map[code]=close;
+      });
+      twseOk=true;
+    }
+  }catch(e){ errors.push("TWSE直連失敗，改走FinMind"); }
 
-  // ── 2. 上市殖利率（openapi.twse.com.tw 有開 CORS，直接呼叫）────────
+  // ── 2. 上市殖利率（openapi.twse.com.tw，失敗靜默跳過）──────────────
   try{
-    const d=await fetch("https://openapi.twse.com.tw/v1/exchangeReport/BWIBBU_ALL",{credentials:'omit',signal:AbortSignal.timeout(15000)}).then(r=>r.json());
+    const d=await fetch("https://openapi.twse.com.tw/v1/exchangeReport/BWIBBU_ALL",
+      {credentials:'omit',signal:AbortSignal.timeout(12000)}).then(r=>r.json());
     if(Array.isArray(d)) d.forEach(row=>{
       const code=(row.Code||"").trim();
       const y=parseFloat((row.DividendYield||"").replace(/,/g,""));
       if(code&&!isNaN(y)&&y>0) yieldMap[code]=y;
     });
-  }catch(e){errors.push("上市殖利率:"+e.message);}
+  }catch(e){}
 
-  // ── 3. 上櫃 / 抓不到的 → FinMind TaiwanOTCPrice ─────────────────
-  const missing=tickers.filter(t=>map[t]==null);
-  if(missing.length){
-    for(let i=0;i<missing.length;i+=50){
-      const chunk=missing.slice(i,i+50);
+  // ── 3. 抓不到的 → FinMind（上市直連失敗 or 上櫃股票）────────────
+  let finmindCount=0;
+
+  // 3a. TWSE 直連失敗 → 用 FinMind TaiwanStockPrice 補上市股票
+  //     上市股票：4碼純數字 1xxx~5xxx 或 ETF 00xxx
+  if(!twseOk){
+    const twseCodes=tickers.filter(t=>map[t]==null&&(/^\d{4}$/.test(t)||/^00\d+$/.test(t)));
+    if(twseCodes.length){
       try{
-        const prices=await fetchFinMind("TaiwanOTCPrice",chunk,
-          new Date(Date.now()-4*86400000).toISOString().slice(0,10));
-        chunk.forEach(t=>{ if(prices[t]!=null) map[t]=prices[t]; });
-      }catch(e){errors.push("上櫃(FinMind):"+e.message);}
+        const prices=await fetchFinMind("TaiwanStockPrice", twseCodes, dateStr);
+        Object.assign(map, prices);
+        finmindCount+=Object.keys(prices).length;
+      }catch(e){ errors.push("FinMind上市:"+e.message); }
     }
   }
 
-  // ── 4. 寫入 state ──────────────────────────────────────────────────
+  // 3b. 仍抓不到的 → 用 FinMind TaiwanOTCPrice 查上櫃
+  const stillMissing=tickers.filter(t=>map[t]==null);
+  if(stillMissing.length){
+    try{
+      const prices=await fetchFinMind("TaiwanOTCPrice", stillMissing, dateStr);
+      Object.assign(map, prices);
+      finmindCount+=Object.keys(prices).length;
+    }catch(e){ errors.push("FinMind上櫃:"+e.message); }
+  }
+
+  // ── 4. 寫入 state ─────────────────────────────────────────────────
   let updated=0,yieldUpdated=0,notFound=[];
   tickers.forEach(t=>{
     if(map[t]!=null){
@@ -491,6 +516,7 @@ async function fetchPrices(){
     priceMsg="更新失敗："+errors.join("；");
   } else {
     priceMsg=`已更新 ${updated} 檔收盤價`+(yieldUpdated?`、${yieldUpdated} 檔殖利率`:"")
+      +(finmindCount?`（其中 ${finmindCount} 檔走 FinMind）`:"")
       +(notFound.length?`，找不到：${notFound.join("、")}`:"")
       +(errors.length?`（部分：${errors.join("；")}）`:"");
   }
@@ -764,8 +790,9 @@ function render(){
       <span class="hint"><i class="ti ti-clock"></i> 收盤價${lastUpdated?"　最後更新："+lastUpdated:"　尚未更新"}</span>
       ${priceLoading
         ?`<span class="spin"></span><span style="font-size:12px;color:var(--text2)">更新中…</span>`
-        :`<button class="btn btn-sm btn-primary" onclick="fetchPrices()"><i class="ti ti-refresh"></i> 更新收盤價</button>`}
-      ${IS_FILE_ORIGIN?`<span class="price-status" style="color:var(--warn,#f59e0b)"><i class="ti ti-alert-triangle"></i> 請用 localhost 開啟（見下方說明）</span>`:""}
+        :`<button class="btn btn-sm btn-primary" onclick="fetchPrices(false)" title="更新所有股票（含已全出清）"><i class="ti ti-refresh"></i> 更新全部</button>
+        <button class="btn btn-sm" onclick="fetchPrices(true)" title="只更新目前有持倉的股票"><i class="ti ti-refresh"></i> 更新持倉</button>`}
+
       ${priceMsg?`<span class="price-status">${priceMsg}</span>`:""}
     </div>`;
 
@@ -1337,7 +1364,8 @@ function render(){
           <div class="tab ${activeTab==="dividends"?"active":""}" onclick="setTab('dividends')">股利紀錄</div>
         </div>
         <div style="display:flex;gap:8px;align-items:center">
-          ${priceLoading?`<span class="spin"></span>`:`<button class="btn btn-sm" onclick="fetchPrices()"><i class="ti ti-refresh"></i> 更新收盤價</button>`}
+          ${priceLoading?`<span class="spin"></span>`:`<button class="btn btn-sm btn-primary" onclick="fetchPrices(false)"><i class="ti ti-refresh"></i> 更新全部</button>
+          <button class="btn btn-sm" onclick="fetchPrices(true)"><i class="ti ti-refresh"></i> 更新持倉</button>`}
           ${addBtn}
         </div>
       </div>
@@ -1596,31 +1624,6 @@ if(FS_SUPPORTED&&!_fileHandle){
 
 render();
 
-// ── 顯示 GitHub Pages / file:// 說明面板 ─────────────────────────────────
-const IS_GITHUB_PAGES = location.hostname.endsWith('github.io') || location.hostname.endsWith('github.com');
-if(IS_FILE_ORIGIN || IS_GITHUB_PAGES){
-  const isGH = IS_GITHUB_PAGES;
-  const banner=document.createElement('div');
-  banner.id='localhost-banner';
-  banner.style.cssText='position:fixed;bottom:0;left:0;right:0;background:#1e293b;color:#e2e8f0;font-size:12px;padding:10px 16px;z-index:9999;border-top:2px solid #f59e0b;line-height:1.7';
-  if(isGH){
-    banner.innerHTML=`<strong style="color:#fbbf24">ℹ 已自動透過 CORS Proxy 更新收盤價</strong>
-      <span style="margin-left:8px;color:#94a3b8">若更新失敗，可下載本機版本，以 localhost 執行以獲得最佳穩定性。</span>
-      <span style="margin-left:12px;color:#94a3b8">方法（Python）：</span>
-      <code style="background:#0f172a;padding:2px 7px;border-radius:4px;color:#7dd3fc">cd Downloads && python -m http.server 8080</code>
-      <button onclick="document.getElementById('localhost-banner').remove()" style="margin-left:12px;background:#334155;color:#e2e8f0;border:none;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:11px">✕ 關閉</button>`;
-  } else {
-    banner.innerHTML=`<strong style="color:#fbbf24">⚠ 請改用 localhost 開啟，才能更新收盤價（CORS 限制）</strong>
-      <span style="margin-left:12px;color:#94a3b8">方法一（Python）：</span>
-      <code style="background:#0f172a;padding:2px 7px;border-radius:4px;color:#7dd3fc">cd Downloads && python -m http.server 8080</code>
-      <span style="margin-left:8px;color:#94a3b8">→ 開啟</span>
-      <a href="http://localhost:8080" target="_blank" style="color:#7dd3fc">http://localhost:8080</a>
-      <span style="margin-left:12px;color:#94a3b8">方法二（Node.js）：</span>
-      <code style="background:#0f172a;padding:2px 7px;border-radius:4px;color:#7dd3fc">npx serve Downloads</code>
-      <button onclick="document.getElementById('localhost-banner').remove()" style="margin-left:12px;background:#334155;color:#e2e8f0;border:none;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:11px">✕ 關閉</button>`;
-  }
-  document.body.appendChild(banner);
-}
 </script>
 </body>
 </html>
