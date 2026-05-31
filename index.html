@@ -350,25 +350,39 @@ function allOperators(){
 const IS_FILE_ORIGIN=location.protocol==="file:";
 
 async function fetchWithProxy(url){
-  // file:// 環境：直接呼叫（瀏覽器對 file:// → https 限制嚴格，但仍試一次）
-  // http://localhost 環境：直接呼叫 twse/tpex 完全沒問題
-  const tries=[
-    url,  // 直接呼叫（localhost 必然成功；file:// 有時可行）
-    `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-    `https://api.codetabs.com/v1/proxy?url=${encodeURIComponent(url)}`,
+  // 判斷是否為 GitHub Pages 或 file:// 環境（需要 CORS proxy）
+  const needsProxy = IS_FILE_ORIGIN || location.hostname.endsWith('github.io') || location.hostname.endsWith('github.com');
+
+  // 代理工廠：每個函式回傳 URL 字串
+  const proxyStrategies = [
+    // 1. 直接呼叫（localhost 必然成功）
+    () => url,
+    // 2. allorigins — 支援 JSON raw 輸出，穩定度高
+    () => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+    // 3. corsproxy.io — 常見替代方案
+    () => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+    // 4. thingproxy — 另一選擇
+    () => `https://thingproxy.freeboard.io/fetch/${url}`,
+    // 5. codetabs
+    () => `https://api.codetabs.com/v1/proxy?url=${encodeURIComponent(url)}`,
   ];
+
+  // GitHub Pages / file:// 環境：跳過直接呼叫，從 proxy 開始
+  const startIdx = needsProxy ? 1 : 0;
+  const tries = proxyStrategies.slice(startIdx);
+
   let lastErr;
-  for(const proxyUrl of tries){
+  for(const getUrl of tries){
+    const proxyUrl = getUrl();
     try{
       const res=await fetch(proxyUrl,{
         credentials:'omit',
-        signal:AbortSignal.timeout(12000)
+        signal:AbortSignal.timeout(15000)
       });
       if(!res.ok) throw new Error(`HTTP ${res.status}`);
       const text=await res.text();
       if(!text||text.trim()==="") throw new Error("空回應");
-      // corsproxy.io 有時回傳 HTML 錯誤頁
+      // 過濾 HTML 錯誤頁
       if(text.trim().startsWith("<")) throw new Error("非 JSON 回應");
       return JSON.parse(text);
     }catch(e){ lastErr=e; }
@@ -1557,19 +1571,29 @@ if(FS_SUPPORTED&&!_fileHandle){
 
 render();
 
-// ── 顯示 file:// 說明面板 ─────────────────────────────────
-if(IS_FILE_ORIGIN){
+// ── 顯示 GitHub Pages / file:// 說明面板 ─────────────────────────────────
+const IS_GITHUB_PAGES = location.hostname.endsWith('github.io') || location.hostname.endsWith('github.com');
+if(IS_FILE_ORIGIN || IS_GITHUB_PAGES){
+  const isGH = IS_GITHUB_PAGES;
   const banner=document.createElement('div');
   banner.id='localhost-banner';
   banner.style.cssText='position:fixed;bottom:0;left:0;right:0;background:#1e293b;color:#e2e8f0;font-size:12px;padding:10px 16px;z-index:9999;border-top:2px solid #f59e0b;line-height:1.7';
-  banner.innerHTML=`<strong style="color:#fbbf24">⚠ 請改用 localhost 開啟，才能更新收盤價（CORS 限制）</strong>
-    <span style="margin-left:12px;color:#94a3b8">方法一（Python）：</span>
-    <code style="background:#0f172a;padding:2px 7px;border-radius:4px;color:#7dd3fc">cd Downloads && python -m http.server 8080</code>
-    <span style="margin-left:8px;color:#94a3b8">→ 開啟</span>
-    <a href="http://localhost:8080" target="_blank" style="color:#7dd3fc">http://localhost:8080</a>
-    <span style="margin-left:12px;color:#94a3b8">方法二（Node.js）：</span>
-    <code style="background:#0f172a;padding:2px 7px;border-radius:4px;color:#7dd3fc">npx serve Downloads</code>
-    <button onclick="document.getElementById('localhost-banner').remove()" style="margin-left:12px;background:#334155;color:#e2e8f0;border:none;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:11px">✕ 關閉</button>`;
+  if(isGH){
+    banner.innerHTML=`<strong style="color:#fbbf24">ℹ 已自動透過 CORS Proxy 更新收盤價</strong>
+      <span style="margin-left:8px;color:#94a3b8">若更新失敗，可下載本機版本，以 localhost 執行以獲得最佳穩定性。</span>
+      <span style="margin-left:12px;color:#94a3b8">方法（Python）：</span>
+      <code style="background:#0f172a;padding:2px 7px;border-radius:4px;color:#7dd3fc">cd Downloads && python -m http.server 8080</code>
+      <button onclick="document.getElementById('localhost-banner').remove()" style="margin-left:12px;background:#334155;color:#e2e8f0;border:none;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:11px">✕ 關閉</button>`;
+  } else {
+    banner.innerHTML=`<strong style="color:#fbbf24">⚠ 請改用 localhost 開啟，才能更新收盤價（CORS 限制）</strong>
+      <span style="margin-left:12px;color:#94a3b8">方法一（Python）：</span>
+      <code style="background:#0f172a;padding:2px 7px;border-radius:4px;color:#7dd3fc">cd Downloads && python -m http.server 8080</code>
+      <span style="margin-left:8px;color:#94a3b8">→ 開啟</span>
+      <a href="http://localhost:8080" target="_blank" style="color:#7dd3fc">http://localhost:8080</a>
+      <span style="margin-left:12px;color:#94a3b8">方法二（Node.js）：</span>
+      <code style="background:#0f172a;padding:2px 7px;border-radius:4px;color:#7dd3fc">npx serve Downloads</code>
+      <button onclick="document.getElementById('localhost-banner').remove()" style="margin-left:12px;background:#334155;color:#e2e8f0;border:none;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:11px">✕ 關閉</button>`;
+  }
   document.body.appendChild(banner);
 }
 </script>
