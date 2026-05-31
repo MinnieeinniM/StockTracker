@@ -349,30 +349,35 @@ function allOperators(){
 // 偵測是否從 file:// 開啟（CORS 限制較嚴格）
 const IS_FILE_ORIGIN=location.protocol==="file:";
 
+// ── 請將下方 YOUR_WORKER_URL 換成你自己的 Cloudflare Worker 網址 ──────────
+// 範例：https://cors-proxy.yourname.workers.dev
+// 部署方法：參見同目錄的 cors-worker.js
+const MY_WORKER = "YOUR_WORKER_URL";
+const hasWorker = MY_WORKER && !MY_WORKER.startsWith("YOUR_");
+
 async function fetchWithProxy(url){
-  // 判斷是否為 GitHub Pages 或 file:// 環境（需要 CORS proxy）
-  const needsProxy = IS_FILE_ORIGIN || location.hostname.endsWith('github.io') || location.hostname.endsWith('github.com');
+  const needsProxy = IS_FILE_ORIGIN || location.hostname.endsWith('github.io');
 
-  // 代理工廠：每個函式回傳 URL 字串
-  const proxyStrategies = [
-    // 1. 直接呼叫（localhost 必然成功）
-    () => url,
-    // 2. allorigins — 支援 JSON raw 輸出，穩定度高
-    () => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-    // 3. corsproxy.io — 常見替代方案
-    () => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
-    // 4. thingproxy — 另一選擇
-    () => `https://thingproxy.freeboard.io/fetch/${url}`,
-    // 5. codetabs
-    () => `https://api.codetabs.com/v1/proxy?url=${encodeURIComponent(url)}`,
-  ];
+  // 依序嘗試的策略
+  const strategies = [];
 
-  // GitHub Pages / file:// 環境：跳過直接呼叫，從 proxy 開始
-  const startIdx = needsProxy ? 1 : 0;
-  const tries = proxyStrategies.slice(startIdx);
+  // 1. 直接呼叫（localhost OK，GitHub Pages 必然失敗但無害）
+  if (!needsProxy) strategies.push(() => url);
+
+  // 2. 自架 Cloudflare Worker（最穩定，設定後優先使用）
+  if (hasWorker) strategies.push(() => `${MY_WORKER}/?url=${encodeURIComponent(url)}`);
+
+  // 3. 公共 proxy 備援（不穩定，僅當 Worker 未設定時使用）
+  if (!hasWorker) {
+    strategies.push(
+      () => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+      () => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+      () => `https://api.codetabs.com/v1/proxy?url=${encodeURIComponent(url)}`,
+    );
+  }
 
   let lastErr;
-  for(const getUrl of tries){
+  for(const getUrl of strategies){
     const proxyUrl = getUrl();
     try{
       const res=await fetch(proxyUrl,{
@@ -382,12 +387,44 @@ async function fetchWithProxy(url){
       if(!res.ok) throw new Error(`HTTP ${res.status}`);
       const text=await res.text();
       if(!text||text.trim()==="") throw new Error("空回應");
-      // 過濾 HTML 錯誤頁
       if(text.trim().startsWith("<")) throw new Error("非 JSON 回應");
       return JSON.parse(text);
     }catch(e){ lastErr=e; }
   }
   throw lastErr||new Error('所有方式均失敗');
+}
+
+// ── FinMind API token（混淆存放，非真正加密）────────────────────────
+const _p1="ZXlKMGVYQWlPaUpLVjFRaUxDSmhiR2NpT2lKSVV6STFOaUo5LmV5SjFjMlZ5";
+const _p2="WDJsa0lqb2lUV2x1Ym1sbFpXbHVibWxOSWl3aVpXMWhhV3dpT2lKaGJtZGxi";
+const _p3="R0V5TWpZMU1ERXdRR2R0WVdsc0xtTnZiU0lzSW5SdmEyVnVYM1psY25OcGIyNGlPakI5LkdpVlRBQVU3SF8wcjZmWmZvbGIwbVhDSmJjbm9TLWlPcEZlb1lOQkhZRTg=";
+function _tk(){ try{ return atob(_p1+_p2+_p3); }catch(e){ return ""; } }
+
+// ── FinMind：上市 + 上櫃收盤價（有開 CORS，免 proxy）────────────────
+// dataset: TaiwanStockPrice       → 上市
+// dataset: TaiwanOTCPrice         → 上櫃
+// 一次帶入多個 data_id 用逗號分隔（免費版單次 600 筆上限）
+async function fetchFinMind(dataset, codes, date){
+  const token=_tk();
+  const ids=codes.join(",");
+  const url=`https://api.finmindtrade.com/api/v4/data?dataset=${dataset}&data_id=${encodeURIComponent(ids)}&start_date=${date}&token=${token}`;
+  const res=await fetch(url,{credentials:'omit',signal:AbortSignal.timeout(20000)});
+  if(!res.ok) throw new Error(`FinMind HTTP ${res.status}`);
+  const json=await res.json();
+  if(json.status!==200) throw new Error(`FinMind status ${json.status}: ${json.msg||""}`);
+  // json.data = [{date,stock_id,close,...}, ...]
+  // 取每支股票最新一筆
+  const latest={};
+  (json.data||[]).forEach(row=>{
+    const id=(row.stock_id||"").trim();
+    if(!latest[id]||row.date>latest[id].date) latest[id]=row;
+  });
+  const result={};
+  Object.entries(latest).forEach(([id,row])=>{
+    const price=parseFloat(row.close);
+    if(!isNaN(price)) result[id]=price;
+  });
+  return result;
 }
 
 async function fetchPrices(){
@@ -400,19 +437,19 @@ async function fetchPrices(){
   const yieldMap={};
   const errors=[];
 
-  // ── 1. 上市收盤價（openapi.twse.com.tw 有開 CORS）
+  // ── 1. 上市收盤價（openapi.twse.com.tw 有開 CORS，直接呼叫）────────
   try{
-    const d=await fetchWithProxy("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL");
+    const d=await fetch("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL",{credentials:'omit',signal:AbortSignal.timeout(15000)}).then(r=>r.json());
     if(Array.isArray(d)) d.forEach(row=>{
       const code=(row.Code||"").trim();
       const close=parseFloat((row.ClosingPrice||"").replace(/,/g,""));
-      if(code&&!isNaN(close)) map[code]={price:close,name:(row.Name||"").trim()};
+      if(code&&!isNaN(close)) map[code]=close;
     });
   }catch(e){errors.push("上市收盤:"+e.message);}
 
-  // ── 2. 上市殖利率（openapi.twse.com.tw）
+  // ── 2. 上市殖利率（openapi.twse.com.tw 有開 CORS，直接呼叫）────────
   try{
-    const d=await fetchWithProxy("https://openapi.twse.com.tw/v1/exchangeReport/BWIBBU_ALL");
+    const d=await fetch("https://openapi.twse.com.tw/v1/exchangeReport/BWIBBU_ALL",{credentials:'omit',signal:AbortSignal.timeout(15000)}).then(r=>r.json());
     if(Array.isArray(d)) d.forEach(row=>{
       const code=(row.Code||"").trim();
       const y=parseFloat((row.DividendYield||"").replace(/,/g,""));
@@ -420,34 +457,26 @@ async function fetchPrices(){
     });
   }catch(e){errors.push("上市殖利率:"+e.message);}
 
-  // ── 3. 上櫃收盤價（tpex_mainboard_daily_close_quotes，有開 CORS）
-  try{
-    const d=await fetchWithProxy("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes");
-    if(Array.isArray(d)) d.forEach(row=>{
-      const code=(row.SecuritiesCompanyCode||"").trim();
-      const close=parseFloat((row.Close||"").replace(/,/g,""));
-      if(code&&!isNaN(close)) map[code]={price:close,name:(row.CompanyName||"").trim()};
-    });
-  }catch(e){errors.push("上櫃收盤:"+e.message);}
+  // ── 3. 上櫃 / 抓不到的 → FinMind TaiwanOTCPrice ─────────────────
+  const missing=tickers.filter(t=>map[t]==null);
+  if(missing.length){
+    for(let i=0;i<missing.length;i+=50){
+      const chunk=missing.slice(i,i+50);
+      try{
+        const prices=await fetchFinMind("TaiwanOTCPrice",chunk,
+          new Date(Date.now()-4*86400000).toISOString().slice(0,10));
+        chunk.forEach(t=>{ if(prices[t]!=null) map[t]=prices[t]; });
+      }catch(e){errors.push("上櫃(FinMind):"+e.message);}
+    }
+  }
 
-  // ── 4. 上櫃殖利率（tpex_mainboard_peratio_analysis，有開 CORS，欄位為 YieldRatio）
-  try{
-    const d=await fetchWithProxy("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_peratio_analysis");
-    if(Array.isArray(d)) d.forEach(row=>{
-      const code=(row.SecuritiesCompanyCode||"").trim();
-      const y=parseFloat((row.YieldRatio||row.DividendYield||"").replace(/,/g,""));
-      if(code&&!isNaN(y)&&y>0) yieldMap[code]=y;
-    });
-  }catch(e){errors.push("上櫃殖利率:"+e.message);}
-
-  // ── 5. 寫入 state
+  // ── 4. 寫入 state ──────────────────────────────────────────────────
   let updated=0,yieldUpdated=0,notFound=[];
   tickers.forEach(t=>{
-    if(map[t]){
-      const price=map[t].price;
+    if(map[t]!=null){
+      const price=map[t];
       state.stocks[t].currentPrice=price;
       state.stocks[t].priceUpdated=new Date().toLocaleString('zh-TW',{hour12:false});
-      if(!state.stocks[t].name) state.stocks[t].name=map[t].name;
       updated++;
       if(yieldMap[t]&&price>0){
         state.stocks[t].annualDividend=Math.round(yieldMap[t]*price)/100;
@@ -471,20 +500,16 @@ async function fetchPrices(){
 async function getStockList(){
   if(_stockListCache) return _stockListCache;
   const list=[];
-  // 上市（openapi.twse.com.tw 有開 CORS）
+  // 上市（openapi.twse.com.tw 有開 CORS，直接呼叫）
   try{
-    const data=await fetchWithProxy("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL");
+    const data=await fetch("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL",{credentials:'omit',signal:AbortSignal.timeout(15000)}).then(r=>r.json());
     if(Array.isArray(data)) data.forEach(r=>list.push({code:(r.Code||"").trim(),name:(r.Name||"").trim()}));
   }catch(e){}
-  // 上櫃（tpex_mainboard_daily_close_quotes，有開 CORS）
-  try{
-    const d2=await fetchWithProxy("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes");
-    if(Array.isArray(d2)) d2.forEach(r=>{
-      const code=(r.SecuritiesCompanyCode||"").trim();
-      const name=(r.CompanyName||"").trim();
-      if(code&&name) list.push({code,name});
-    });
-  }catch(e){}
+  // 上櫃：tpex.org.tw 在 GitHub Pages 有 CORS 限制
+  // 已持有的上櫃股票從 state 補入，讓 autocomplete 仍可搜尋
+  Object.entries(state.stocks||{}).forEach(([code,s])=>{
+    if(s.name&&!list.find(l=>l.code===code)) list.push({code,name:s.name});
+  });
   _stockListCache=list;
   return list;
 }
