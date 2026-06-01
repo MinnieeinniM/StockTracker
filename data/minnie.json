@@ -92,6 +92,24 @@
       "annualDividend": 0,
       "priceUpdated": ""
     },
+    "2002": {
+      "name": "中鋼",
+      "lots": [
+        {
+          "id": 140,
+          "date": "2026-06-01",
+          "type": "buy",
+          "shares": 1000,
+          "total": 1000,
+          "broker": "新光",
+          "operator": "我"
+        }
+      ],
+      "dividends": [],
+      "currentPrice": 0,
+      "annualDividend": 0,
+      "priceUpdated": ""
+    },
     "2017": {
       "name": "官田鋼",
       "lots": [
@@ -1381,6 +1399,6 @@
       "priceUpdated": "2026/5/30 22:50:41"
     }
   },
-  "nextId": 140,
+  "nextId": 141,
   "_saved": true
 }
