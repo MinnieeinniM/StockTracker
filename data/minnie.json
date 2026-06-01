@@ -11,6 +11,24 @@
     "咘"
   ],
   "stocks": {
+    "1101": {
+      "name": "台泥",
+      "lots": [
+        {
+          "id": 140,
+          "date": "2026-06-01",
+          "type": "buy",
+          "shares": 1000,
+          "total": 100,
+          "broker": "新光",
+          "operator": "我"
+        }
+      ],
+      "dividends": [],
+      "currentPrice": 0,
+      "annualDividend": 0,
+      "priceUpdated": ""
+    },
     "1727": {
       "name": "中華化",
       "lots": [
@@ -89,24 +107,6 @@
       ],
       "dividends": [],
       "currentPrice": 106,
-      "annualDividend": 0,
-      "priceUpdated": ""
-    },
-    "2002": {
-      "name": "中鋼",
-      "lots": [
-        {
-          "id": 140,
-          "date": "2026-06-01",
-          "type": "buy",
-          "shares": 1000,
-          "total": 1000,
-          "broker": "新光",
-          "operator": "我"
-        }
-      ],
-      "dividends": [],
-      "currentPrice": 0,
       "annualDividend": 0,
       "priceUpdated": ""
     },
