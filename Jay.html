@@ -234,6 +234,114 @@ function save(){
 }
 
 // ════════════════════════════════════════════════════════
+// GITHUB SYNC
+// ════════════════════════════════════════════════════════
+let _ghToken=localStorage.getItem('gh_token')||"";
+let _ghRepo=localStorage.getItem('gh_repo')||"";   // e.g. "username/StockTracker"
+let _ghPath=localStorage.getItem('gh_path')||"";   // e.g. "index.html"
+let _ghSha="";
+let _ghStatus="";
+let _ghSyncing=false;
+
+async function ghFetchSha(){
+  if(!_ghToken||!_ghRepo||!_ghPath) return;
+  try{
+    const r=await fetch(`https://api.github.com/repos/${_ghRepo}/contents/${_ghPath}`,{
+      headers:{"Authorization":"token "+_ghToken,"Accept":"application/vnd.github.v3+json"}
+    });
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const d=await r.json();
+    _ghSha=d.sha||"";
+  }catch(e){console.warn("ghFetchSha",e);}
+}
+
+async function writeToGitHub(){
+  if(!_ghToken||!_ghRepo||!_ghPath||_ghSyncing) return;
+  _ghSyncing=true;
+  _ghStatus="⏳ 同步中…";
+  updateGhStatusEl();
+  try{
+    // 先取最新 sha
+    const infoR=await fetch(`https://api.github.com/repos/${_ghRepo}/contents/${_ghPath}`,{
+      headers:{"Authorization":"token "+_ghToken,"Accept":"application/vnd.github.v3+json"}
+    });
+    if(!infoR.ok) throw new Error("無法取得檔案資訊 HTTP "+infoR.status);
+    const info=await infoR.json();
+    _ghSha=info.sha;
+
+    // 取原始 HTML 內容
+    const rawR=await fetch(`https://raw.githubusercontent.com/${_ghRepo}/main/${_ghPath}?t=${Date.now()}`);
+    let html=rawR.ok?await rawR.text():atob(info.content.replace(/\n/g,""));
+
+    // 替換資料區塊
+    const ms="/*DATA_START*/",me="/*DATA_END*/";
+    const toSave={...state,_saved:true};
+    const newData=`${ms}\nconst DEMO=${JSON.stringify(toSave,null,0)};\n${me}`;
+    html=html.includes(ms)
+      ?html.replace(/\/\*DATA_START\*\/[\s\S]*?\/\*DATA_END\*\//,newData)
+      :html.replace(/const DEMO\s*=\s*\{[\s\S]*?\};\s*\n/,newData+"\n");
+
+    // 推回 GitHub
+    const putR=await fetch(`https://api.github.com/repos/${_ghRepo}/contents/${_ghPath}`,{
+      method:"PUT",
+      headers:{"Authorization":"token "+_ghToken,"Accept":"application/vnd.github.v3+json","Content-Type":"application/json"},
+      body:JSON.stringify({message:"update stock data "+new Date().toLocaleString('zh-TW'),content:btoa(unescape(encodeURIComponent(html))),sha:_ghSha})
+    });
+    if(!putR.ok){
+      const err=await putR.json();
+      throw new Error(err.message||"HTTP "+putR.status);
+    }
+    const result=await putR.json();
+    _ghSha=result.content.sha;
+    _ghStatus="✓ 已同步 GitHub "+new Date().toLocaleTimeString('zh-TW',{hour12:false});
+  }catch(e){
+    _ghStatus="⚠ GitHub 同步失敗："+e.message;
+  }
+  _ghSyncing=false;
+  updateGhStatusEl();
+}
+
+function updateGhStatusEl(){
+  const el=document.getElementById('gh-status');
+  if(el){
+    if(_ghStatus.startsWith('⏳')) el.textContent='同步中…';
+    else if(_ghStatus.startsWith('✓')) el.textContent='已同步';
+    else if(_ghStatus.startsWith('⚠')) el.textContent='同步失敗';
+    else el.textContent='同步 GitHub';
+    const btn=el.closest('button');
+    if(btn) btn.title=_ghStatus;
+  }
+}
+
+function saveGhSettings(){
+  const t=(document.getElementById('gh-token-input').value||"").trim();
+  const r=(document.getElementById('gh-repo-input').value||"").trim();
+  const p=(document.getElementById('gh-path-input').value||"").trim();
+  if(!t||!r||!p){alert("請填寫所有欄位");return;}
+  _ghToken=t;_ghRepo=r;_ghPath=p;
+  localStorage.setItem('gh_token',t);
+  localStorage.setItem('gh_repo',r);
+  localStorage.setItem('gh_path',p);
+  _ghStatus="✓ 設定已儲存，下次更新資料時自動同步";
+  modal=null;render();
+  ghFetchSha();
+}
+
+function clearGhSettings(){
+  if(!confirm("確定清除 GitHub 設定？")) return;
+  _ghToken="";_ghRepo="";_ghPath="";_ghStatus="";
+  localStorage.removeItem('gh_token');localStorage.removeItem('gh_repo');localStorage.removeItem('gh_path');
+  render();
+}
+
+window.saveGhSettings=saveGhSettings;
+window.clearGhSettings=clearGhSettings;
+window.writeToGitHub=writeToGitHub;
+
+// 啟動時取 sha
+if(_ghToken&&_ghRepo&&_ghPath) ghFetchSha();
+
+// ════════════════════════════════════════════════════════
 // CORE LOGIC — 每個函式都可傳入 broker/operator 篩選
 // ════════════════════════════════════════════════════════
 
@@ -426,6 +534,50 @@ async function fetchFinMind(dataset, codes, date){
 }
 
 
+// ── 抓全市場財務指標（本益比）via FinMind ─────────────────────
+let fundamentalsLoading=false;
+let fundamentalsMsg="";
+
+async function fetchFundamentals(){
+  if(fundamentalsLoading) return;
+  fundamentalsLoading=true; fundamentalsMsg=""; render();
+
+  const tickers=Object.keys(state.stocks);
+  if(!tickers.length){fundamentalsLoading=false;fundamentalsMsg="尚無股票";render();return;}
+
+  const dateStr=new Date(Date.now()-4*86400000).toISOString().slice(0,10);
+  const token=_tk();
+  const perMap={};
+  let errors=0;
+
+  // 逐一查詢（跟抓股價相同方式，走 fetchWithProxy 相容 file://）
+  await Promise.allSettled(tickers.map(async t=>{
+    try{
+      const url=`https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPER&data_id=${encodeURIComponent(t)}&start_date=${dateStr}&token=${token}`;
+      const json=await fetchWithProxy(url);
+      if(json.status!==200) return;
+      const rows=json.data||[];
+      if(!rows.length) return;
+      const latest=rows.reduce((a,b)=>a.date>b.date?a:b);
+      const pe=parseFloat(latest.PER);
+      if(!isNaN(pe)&&pe>0) perMap[t]=parseFloat(pe.toFixed(2));
+    }catch(e){ errors++; }
+  }));
+
+  let updated=0;
+  Object.keys(state.stocks).forEach(t=>{
+    if(perMap[t]!=null){ state.stocks[t].per=perMap[t]; updated++; }
+  });
+
+  if(updated>0) save();
+  const dateLabel=new Date().toLocaleDateString('zh-TW',{hour12:false});
+  fundamentalsMsg=`已更新 ${updated} 檔本益比（${dateLabel}）`+(errors?`，${errors} 檔失敗`:'');
+  fundamentalsLoading=false;
+  render();
+}
+
+window.fetchFundamentals=fetchFundamentals;
+
 async function fetchPrices(onlyHolding=false){
   if(priceLoading)return;
   priceLoading=true;priceMsg="";render();
@@ -438,6 +590,7 @@ async function fetchPrices(onlyHolding=false){
 
   const map={};
   const yieldMap={};
+  const perMap={};
   const errors=[];
   const dateStr=new Date(Date.now()-4*86400000).toISOString().slice(0,10);
 
@@ -465,6 +618,8 @@ async function fetchPrices(onlyHolding=false){
       const code=(row.Code||"").trim();
       const y=parseFloat((row.DividendYield||"").replace(/,/g,""));
       if(code&&!isNaN(y)&&y>0) yieldMap[code]=y;
+      const pe=parseFloat((row.PEratio||"").replace(/,/g,""));
+      if(code&&!isNaN(pe)&&pe>0) perMap[code]=pe;
     });
   }catch(e){}
 
@@ -508,6 +663,7 @@ async function fetchPrices(onlyHolding=false){
         state.stocks[t].annualDividend=Math.round(yieldMap[t]*price)/100;
         yieldUpdated++;
       }
+      if(perMap[t]) state.stocks[t].per=parseFloat(perMap[t].toFixed(2));
     }else notFound.push(t);
   });
 
@@ -525,25 +681,41 @@ async function fetchPrices(onlyHolding=false){
 }
 // ── Stock list autocomplete ───────────────────────────────
 async function getStockList(){
-  if(_stockListCache) return _stockListCache;
+  if(_stockListCache&&_stockListCache.length>10) return _stockListCache;
   const list=[];
-  // 上市（openapi.twse.com.tw 有開 CORS，直接呼叫）
+  const seen=new Set();
+  const add=(code,name)=>{code=(code||"").trim();name=(name||"").trim();if(code&&name&&!seen.has(code)){seen.add(code);list.push({code,name});}};
+
+  // 上市
   try{
-    const data=await fetch("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL",{credentials:'omit',signal:AbortSignal.timeout(15000)}).then(r=>r.json());
-    if(Array.isArray(data)) data.forEach(r=>list.push({code:(r.Code||"").trim(),name:(r.Name||"").trim()}));
+    const res=await fetch("https://www.twse.com.tw/rwd/zh/afterTrading/STOCK_DAY_ALL?response=json",{credentials:'omit',signal:AbortSignal.timeout(10000)});
+    const data=await res.json();
+    if(data&&data.data) data.data.forEach(r=>add(r[0],r[1]));
   }catch(e){}
-  // 上櫃：tpex.org.tw 在 GitHub Pages 有 CORS 限制
-  // 已持有的上櫃股票從 state 補入，讓 autocomplete 仍可搜尋
-  Object.entries(state.stocks||{}).forEach(([code,s])=>{
-    if(s.name&&!list.find(l=>l.code===code)) list.push({code,name:s.name});
-  });
+
+  // 上櫃
+  try{
+    const r2=await fetch("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes",{credentials:'omit',signal:AbortSignal.timeout(10000)});
+    const d2=await r2.json();
+    if(Array.isArray(d2)) d2.forEach(r=>add(r.SecuritiesCompanyCode,r.CompanyName));
+  }catch(e){}
+
+  // 已持有的補入（確保搜尋得到）
+  Object.entries(state.stocks||{}).forEach(([code,s])=>add(code,s.name));
+
   _stockListCache=list;
   return list;
 }
 function filterStocks(list,q){
   if(!q||q.length<1) return[];
   const lq=q.toLowerCase();
-  return list.filter(s=>s.code.startsWith(q)||s.name.toLowerCase().includes(lq)).slice(0,8);
+  const exact=[],start=[],contain=[];
+  list.forEach(s=>{
+    if(s.code===q) exact.push(s);
+    else if(s.code.startsWith(q)) start.push(s);
+    else if(s.name.toLowerCase().includes(lq)) contain.push(s);
+  });
+  return [...exact,...start,...contain].slice(0,10);
 }
 
 // ── Export Excel ──────────────────────────────────────────
@@ -739,6 +911,41 @@ function render(){
       <div class="form-row" style="margin-top:10px"><label>新增操作人</label>
         <div style="display:flex;gap:8px"><input id="m-op-new" placeholder="例：小明"/>
           <button class="btn btn-primary btn-sm" onclick="doAddOperator()">新增</button></div></div>
+      <div class="modal-section">
+        <div class="modal-section-title"><i class="ti ti-link"></i> 本機檔案・自動存回</div>
+        ${FS_SUPPORTED
+          ?(_fileHandle
+            ?`<div style="font-size:12px;color:var(--success-t);background:var(--success-bg);border:.5px solid var(--success-bd);border-radius:var(--r);padding:8px 12px;margin-bottom:8px">✓ 已連結本機檔案</div>
+               <div style="font-size:12px;color:var(--text2)">${_saveStatus||''}</div>`
+            :`<div style="font-size:12px;color:var(--text2);margin-bottom:8px;line-height:1.6">連結本機 HTML 檔案後，每次更新資料會自動寫回檔案。</div>
+               <button class="btn btn-sm" onclick="requestFileAccess()" style="border-color:var(--warn-bd);background:var(--warn-bg);color:var(--warn-t)"><i class="ti ti-link"></i> 連結檔案・自動存回</button>`)
+          :`<div style="font-size:12px;color:var(--text3)">請用 Chrome 或 Edge 開啟此功能。</div>`}
+      </div>
+      <div class="modal-section">
+        <div class="modal-section-title"><i class="ti ti-brand-github"></i> GitHub 自動同步</div>
+        ${_ghToken?`
+        <div style="font-size:12px;color:var(--success-t);background:var(--success-bg);border:.5px solid var(--success-bd);border-radius:var(--r);padding:8px 12px;margin-bottom:10px">
+          ✓ 已設定：${_ghRepo} / ${_ghPath}
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-sm btn-warn" onclick="writeToGitHub()"><i class="ti ti-cloud-upload"></i> 立即同步</button>
+          <button class="btn btn-sm btn-danger" onclick="clearGhSettings()"><i class="ti ti-trash"></i> 清除設定</button>
+        </div>`:`
+        <div style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.6">
+          設定後，每次新增/修改資料都會自動存回 GitHub，任何裝置打開網址都是最新資料。
+        </div>
+        <div class="form-row"><label>Personal Access Token</label>
+          <input id="gh-token-input" type="password" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off"/>
+          <div class="hint-text">GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)，勾選 <strong>repo</strong> 權限</div>
+        </div>
+        <div class="form-row"><label>Repository（帳號/repo名稱）</label>
+          <input id="gh-repo-input" placeholder="例：minnieeinnim/StockTracker"/>
+        </div>
+        <div class="form-row"><label>檔案路徑</label>
+          <input id="gh-path-input" placeholder="例：index.html"/>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="saveGhSettings()"><i class="ti ti-check"></i> 儲存 GitHub 設定</button>`}
+      </div>
       <div class="modal-btns"><button class="btn btn-primary" onclick="cM()">完成</button></div>
     </div></div>`;
   }
@@ -792,9 +999,11 @@ function render(){
       ${priceLoading
         ?`<span class="spin"></span><span style="font-size:12px;color:var(--text2)">更新中…</span>`
         :`<button class="btn btn-sm btn-primary" onclick="fetchPrices(false)" title="更新所有股票（含已全出清）"><i class="ti ti-refresh"></i> 更新全部</button>
-        <button class="btn btn-sm" onclick="fetchPrices(true)" title="只更新目前有持倉的股票"><i class="ti ti-refresh"></i> 更新持倉</button>`}
+        <button class="btn btn-sm" onclick="fetchPrices(true)" title="只更新目前有持倉的股票"><i class="ti ti-refresh"></i> 更新持倉</button>
+        <button class="btn btn-sm" onclick="fetchFundamentals()" title="從 FinMind 抓全市場本益比" style="border-color:var(--info-bd);color:var(--info-t)">${fundamentalsLoading?'<span class="spin"></span> 抓取中…':`<i class="ti ti-trending-up"></i> 更新本益比`}</button>`}
 
       ${priceMsg?`<span class="price-status">${priceMsg}</span>`:""}
+      ${fundamentalsMsg?`<span class="price-status" style="color:var(--info-t)">${fundamentalsMsg}</span>`:""}
     </div>`;
 
     const cards=filtered.length===0
@@ -859,7 +1068,10 @@ function render(){
                 ${tOp.length===1?`<span class="badge badge-op"><i class="ti ti-user" style="font-size:10px"></i> ${tOp[0]}</span>`:""}
               </div>
             </div>
-            ${s.annualDividend?`<span class="yield-badge"><i class="ti ti-chart-pie"></i> 殖利率 ${y}%</span>`:""}
+            <div style="display:flex;gap:5px;flex-wrap:wrap">
+              ${s.annualDividend?`<span class="yield-badge"><i class="ti ti-chart-pie"></i> 殖利率 ${y}%</span>`:""}
+              ${s.per?`<span class="yield-badge" style="background:var(--info-bg);color:var(--info-t)"><i class="ti ti-trending-up"></i> 本益比 ${s.per}x</span>`:""}
+            </div>
             <div class="card-stats">
               <div class="stat">持股數<span>${fmt(shares)} 股</span></div>
               <div class="stat">收盤價<span>${price?fmtP(price)+" 元":"尚未更新"}</span></div>
@@ -872,16 +1084,14 @@ function render(){
           </div>`;
         }).join("");
 
-    const fileBtn=FS_SUPPORTED
-      ?(_fileHandle
-        ?`<span id="save-status" style="font-size:11px;color:var(--success-t);background:var(--success-bg);border:.5px solid var(--success-bd);border-radius:var(--r);padding:4px 10px">${_saveStatus||"✓ 已連結"}</span>`
-        :`<button class="btn btn-sm" onclick="requestFileAccess()" style="border-color:var(--warn-bd);background:var(--warn-bg);color:var(--warn-t)"><i class="ti ti-link"></i> 連結檔案・自動存回</button>`)
-      :`<span style="font-size:11px;color:var(--text3)">請用 Chrome/Edge 啟用自動存檔</span>`;
+    const ghSyncBtn=_ghToken
+      ?`<button class="btn btn-sm" onclick="writeToGitHub()" style="border-color:var(--info-bd);background:var(--info-bg);color:var(--info-t)" title="${_ghStatus}"><i class="ti ti-cloud-upload"></i> <span id="gh-status">${_ghStatus&&_ghStatus.startsWith('✓')?'已同步':_ghStatus&&_ghStatus.startsWith('⚠')?'同步失敗':'同步 GitHub'}</span></button>`
+      :'';
 
     app.innerHTML=`
       <div class="topbar">
         <h1><i class="ti ti-briefcase"></i> 我的持股</h1>
-        ${fileBtn}
+        ${ghSyncBtn}
         <button class="btn btn-sm" onclick="goUnrealized()"><i class="ti ti-trending-up"></i> 未實現損益</button>
         <button class="btn btn-sm" onclick="goRealized()"><i class="ti ti-chart-bar"></i> 已實現損益</button>
         <button class="btn btn-sm" onclick="exportExcel()"><i class="ti ti-download"></i> 匯出 Excel</button>
@@ -1332,12 +1542,12 @@ function render(){
     :activeTab==="realized"?""
     :`<button class="btn btn-primary btn-sm" onclick="oM('add-tx')"><i class="ti ti-plus"></i> 新增交易</button>`;
 
-  const fileBtn=FS_SUPPORTED&&!_fileHandle
-    ?`<button class="btn btn-sm" onclick="requestFileAccess()" style="border-color:var(--warn-bd);background:var(--warn-bg);color:var(--warn-t);font-size:11px"><i class="ti ti-link"></i> 連結檔案</button>`
-    :(_fileHandle&&_saveStatus?`<span id="save-status" style="font-size:11px;color:var(--success-t)">${_saveStatus}</span>`:"");
-
   const tBrBadges=tickerBrokers(sel);
   const tOpBadges=tickerOperators(sel);
+
+  const ghSyncBtnDetail=_ghToken
+    ?`<button class="btn btn-sm" onclick="writeToGitHub()" style="border-color:var(--info-bd);background:var(--info-bg);color:var(--info-t)" title="${_ghStatus}"><i class="ti ti-cloud-upload"></i> <span id="gh-status">${_ghStatus&&_ghStatus.startsWith('✓')?'已同步':_ghStatus&&_ghStatus.startsWith('⚠')?'同步失敗':'同步 GitHub'}</span></button>`
+    :'';
 
   app.innerHTML=`
     <div class="topbar">
@@ -1345,7 +1555,7 @@ function render(){
       <h1>${s.name} <span style="font-size:13px;color:var(--text2)">${sel}</span>
         ${tBrBadges.map(b=>`<span class="badge badge-broker">${b}</span>`).join("")}
       </h1>
-      ${fileBtn}
+      ${ghSyncBtnDetail}
       <button class="btn btn-sm" onclick="oM('edit-stock')"><i class="ti ti-settings"></i> 設定</button>
     </div>
     ${detailFilterHtml}
@@ -1365,8 +1575,6 @@ function render(){
           <div class="tab ${activeTab==="dividends"?"active":""}" onclick="setTab('dividends')">股利紀錄</div>
         </div>
         <div style="display:flex;gap:8px;align-items:center">
-          ${priceLoading?`<span class="spin"></span>`:`<button class="btn btn-sm btn-primary" onclick="fetchPrices(false)"><i class="ti ti-refresh"></i> 更新全部</button>
-          <button class="btn btn-sm" onclick="fetchPrices(true)"><i class="ti ti-refresh"></i> 更新持倉</button>`}
           ${addBtn}
         </div>
       </div>
@@ -1451,11 +1659,17 @@ let _acItems=[],_acIdx=-1;
 function bindSearchModal(){ getStockList().then(()=>{}); }
 
 window.handleStockSearch=async(q)=>{
+  const el=document.getElementById('autocomplete-list');
+  if(!el)return;
+  if(!q||q.length<1){el.style.display='none';return;}
+  // show loading if list not cached
+  if(!_stockListCache){
+    el.style.display='block';
+    el.innerHTML=`<div class="autocomplete-item" style="color:var(--text3)"><span class="spin"></span> 載入股票清單中…</div>`;
+  }
   const list=await getStockList();
   const results=filterStocks(list,q);
   _acItems=results;_acIdx=-1;
-  const el=document.getElementById('autocomplete-list');
-  if(!el)return;
   if(!results.length){el.style.display='none';return;}
   el.style.display='block';
   el.innerHTML=results.map((s,i)=>
