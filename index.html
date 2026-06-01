@@ -1582,8 +1582,8 @@ function getSmartDate(id){
 let _acItems=[],_acIdx=-1;
 function bindSearchModal(){
   getStockList().then(()=>{});
-  // 等 DOM render 完再綁
-  setTimeout(()=>{
+  // 用 requestAnimationFrame 確保 DOM 已 render
+  requestAnimationFrame(()=>{
     const input=document.getElementById('m-search');
     if(!input||input._imeBound) return;
     input._imeBound=true;
@@ -1592,7 +1592,8 @@ function bindSearchModal(){
     input.addEventListener('compositionend',()=>{ _composing=false; handleStockSearch(input.value); });
     input.addEventListener('input',()=>{ if(!_composing) handleStockSearch(input.value); });
     input.addEventListener('keydown',(e)=>handleSearchKey(e));
-  },0);
+    input.focus();
+  });
 }
 
 window.handleStockSearch=async(q)=>{
