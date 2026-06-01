@@ -9,12 +9,23 @@
   "stocks": {
     "3481": {
       "name": "群創",
-      "lots": [],
+      "lots": [
+        {
+          "id": 1,
+          "date": "2026-06-01",
+          "type": "buy",
+          "shares": 1000,
+          "total": 0,
+          "broker": "新光",
+          "operator": "Jay"
+        }
+      ],
       "dividends": [],
       "currentPrice": 0,
       "annualDividend": 0,
       "priceUpdated": ""
     }
   },
-  "nextId": 1
+  "nextId": 2,
+  "_saved": true
 }
