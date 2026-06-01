@@ -175,6 +175,22 @@ async function loadState(){
   });
 } // end loadState
 
+// ════════════════════════════════════════════════════════
+// SAVE — localStorage 快取 + 觸發 GitHub 同步
+// JSON 架構下無法直接寫回伺服器，localStorage 作為本地快取，
+// 下次 loadState 若 fetch 失敗會自動 fallback 讀這裡。
+// 若已設定 GitHub 連結，同時觸發 writeToGitHub()。
+// ════════════════════════════════════════════════════════
+function save(){
+  try{
+    localStorage.setItem('stock_'+_user, JSON.stringify(state));
+  }catch(e){
+    console.warn('localStorage write failed:', e);
+  }
+  // 非同步同步到 GitHub（設定好才會執行，否則直接 return）
+  writeToGitHub();
+}
+
 let view="list";
 let sel=null;
 let modal=null;
@@ -901,8 +917,7 @@ function render(){
       <div class="filter-row" style="margin-bottom:6px">
         <span class="filter-label"><i class="ti ti-search" style="font-size:13px"></i></span>
         <div style="position:relative;flex:1;max-width:260px">
-          <input value="${sqEsc}" placeholder="搜尋股票代號或名稱…"
-            oninput="setStockSearch(this.value)"
+          <input id="stock-search-input" value="${sqEsc}" placeholder="搜尋股票代號或名稱…"
             style="width:100%;padding:5px 28px 5px 10px;border-radius:999px;border:.5px solid var(--border2);background:var(--surface);color:var(--text);font-size:13px;font-family:inherit"/>
           ${stockSearch?`<span onclick="setStockSearch('')" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--text3);font-size:14px;line-height:1">✕</span>`:""}
         </div>
@@ -1027,8 +1042,18 @@ function render(){
       <div class="stock-grid">${cards}</div>
       ${mHtml}`;
     if(modal==="add-stock") bindSearchModal();
-    // 搜尋框 focus 保留
-    if(stockSearch){const el=document.querySelector('[oninput="setStockSearch(this.value)"]');if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length);}}
+    // 持股搜尋欄：IME-aware 綁定（防注音輸入中途觸發）
+    requestAnimationFrame(()=>{
+      const si=document.getElementById('stock-search-input');
+      if(si&&!si._imeBound){
+        si._imeBound=true;
+        let _composing=false;
+        si.addEventListener('compositionstart',()=>{ _composing=true; });
+        si.addEventListener('compositionend',()=>{ _composing=false; setStockSearch(si.value); });
+        si.addEventListener('input',()=>{ if(!_composing) setStockSearch(si.value); });
+      }
+      if(si&&stockSearch){ si.focus(); si.setSelectionRange(si.value.length,si.value.length); }
+    });
     return;
   }
 
