@@ -793,7 +793,7 @@ function render(){
       <div class="form-row"><label><span class="step-badge">1</span>搜尋股票</label>
         <div class="search-wrap">
           <input id="m-search" placeholder="輸入代號如 2454 或名稱如 聯發科"
-            oninput="handleStockSearch(this.value)" onkeydown="handleSearchKey(event)" autocomplete="off"/>
+            autocomplete="off"/>
           <div id="autocomplete-list" class="autocomplete-list" style="display:none"></div>
         </div>
       </div>
@@ -1656,7 +1656,20 @@ function getSmartDate(id){
 // AUTOCOMPLETE
 // ════════════════════════════════════════════════════════
 let _acItems=[],_acIdx=-1;
-function bindSearchModal(){ getStockList().then(()=>{}); }
+function bindSearchModal(){
+  getStockList().then(()=>{});
+  // 等 DOM render 完再綁
+  setTimeout(()=>{
+    const input=document.getElementById('m-search');
+    if(!input||input._imeBound) return;
+    input._imeBound=true;
+    let _composing=false;
+    input.addEventListener('compositionstart',()=>{ _composing=true; });
+    input.addEventListener('compositionend',()=>{ _composing=false; handleStockSearch(input.value); });
+    input.addEventListener('input',()=>{ if(!_composing) handleStockSearch(input.value); });
+    input.addEventListener('keydown',(e)=>handleSearchKey(e));
+  },0);
+}
 
 window.handleStockSearch=async(q)=>{
   const el=document.getElementById('autocomplete-list');
