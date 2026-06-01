@@ -1,7 +1,20 @@
 {
-  "brokers": [],
-  "operators": [],
-  "stocks": {},
-  "nextId": 1,
-  "_saved": true
+  "brokers": [
+    "新光",
+    "凱基"
+  ],
+  "operators": [
+    "Jay"
+  ],
+  "stocks": {
+    "3481": {
+      "name": "群創",
+      "lots": [],
+      "dividends": [],
+      "currentPrice": 0,
+      "annualDividend": 0,
+      "priceUpdated": ""
+    }
+  },
+  "nextId": 1
 }
