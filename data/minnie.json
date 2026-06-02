@@ -627,6 +627,24 @@
       "priceUpdated": "2026/6/1 11:45:57",
       "per": 15.9
     },
+    "3317": {
+      "name": "尼克森",
+      "lots": [
+        {
+          "id": 142,
+          "date": "2026-06-02",
+          "type": "buy",
+          "shares": 1000,
+          "total": 80132,
+          "broker": "新光",
+          "operator": "媽"
+        }
+      ],
+      "dividends": [],
+      "currentPrice": 0,
+      "annualDividend": 0,
+      "priceUpdated": ""
+    },
     "3481": {
       "name": "群創",
       "lots": [
@@ -1421,6 +1439,6 @@
       "priceUpdated": "2026/6/1 11:45:57"
     }
   },
-  "nextId": 142,
+  "nextId": 143,
   "_saved": true
 }
