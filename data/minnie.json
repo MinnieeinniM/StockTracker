@@ -917,6 +917,24 @@
       "priceUpdated": "2026/6/1 11:45:57",
       "per": 13.73
     },
+    "6215": {
+      "name": "和椿",
+      "lots": [
+        {
+          "id": 143,
+          "date": "2026-06-02",
+          "type": "buy",
+          "shares": 1000,
+          "total": 117547,
+          "broker": "新光",
+          "operator": "媽"
+        }
+      ],
+      "dividends": [],
+      "currentPrice": 0,
+      "annualDividend": 0,
+      "priceUpdated": ""
+    },
     "6257": {
       "name": "矽格",
       "lots": [
@@ -1439,6 +1457,6 @@
       "priceUpdated": "2026/6/1 11:45:57"
     }
   },
-  "nextId": 143,
+  "nextId": 144,
   "_saved": true
 }
