@@ -55,6 +55,15 @@
           "total": 110044,
           "broker": "新光",
           "operator": "Jay"
+        },
+        {
+          "id": 7,
+          "date": "2026-06-03",
+          "type": "sell",
+          "shares": 1000,
+          "total": 111787,
+          "broker": "新光",
+          "operator": "Jay"
         }
       ],
       "dividends": [],
@@ -91,6 +100,6 @@
       "priceUpdated": "2026/6/4 21:15:33"
     }
   },
-  "nextId": 7,
+  "nextId": 8,
   "_saved": true
 }
