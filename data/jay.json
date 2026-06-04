@@ -53,8 +53,26 @@
       "annualDividend": 0,
       "priceUpdated": "2026/6/4 21:10:35",
       "per": 75.71
+    },
+    "3645": {
+      "name": "達邁",
+      "lots": [
+        {
+          "id": 4,
+          "date": "2026-06-04",
+          "type": "buy",
+          "shares": 1000,
+          "total": 100309,
+          "broker": "新光",
+          "operator": "Jay"
+        }
+      ],
+      "dividends": [],
+      "currentPrice": 0,
+      "annualDividend": 0,
+      "priceUpdated": ""
     }
   },
-  "nextId": 4,
+  "nextId": 5,
   "_saved": true
 }
