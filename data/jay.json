@@ -12,10 +12,10 @@
       "lots": [
         {
           "id": 1,
-          "date": "2026-06-01",
+          "date": "2026-06-02",
           "type": "buy",
-          "shares": 1000,
-          "total": 0,
+          "shares": 2000,
+          "total": 111045,
           "broker": "新光",
           "operator": "Jay"
         }
