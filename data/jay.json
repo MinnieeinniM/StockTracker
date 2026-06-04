@@ -23,7 +23,7 @@
       "dividends": [],
       "currentPrice": 55.8,
       "annualDividend": 0,
-      "priceUpdated": "2026/6/4 21:15:15",
+      "priceUpdated": "2026/6/4 21:15:33",
       "per": 507.27
     },
     "3580": {
@@ -51,7 +51,7 @@
       "dividends": [],
       "currentPrice": 106,
       "annualDividend": 0,
-      "priceUpdated": "2026/6/4 21:10:35",
+      "priceUpdated": "2026/6/4 21:15:33",
       "per": 75.71
     },
     "3645": {
@@ -77,9 +77,9 @@
         }
       ],
       "dividends": [],
-      "currentPrice": 0,
+      "currentPrice": 100,
       "annualDividend": 0,
-      "priceUpdated": ""
+      "priceUpdated": "2026/6/4 21:15:33"
     }
   },
   "nextId": 6,
