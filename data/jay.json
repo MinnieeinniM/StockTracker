@@ -25,8 +25,26 @@
       "annualDividend": 0,
       "priceUpdated": "2026/6/4 21:02:03",
       "per": 463.64
+    },
+    "3580": {
+      "name": "友威科",
+      "lots": [
+        {
+          "id": 2,
+          "date": "2026-06-04",
+          "type": "sell",
+          "shares": 1000,
+          "total": 109,
+          "broker": "新光",
+          "operator": "Jay"
+        }
+      ],
+      "dividends": [],
+      "currentPrice": 0,
+      "annualDividend": 0,
+      "priceUpdated": ""
     }
   },
-  "nextId": 2,
+  "nextId": 3,
   "_saved": true
 }
