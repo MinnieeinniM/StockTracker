@@ -7,6 +7,24 @@
     "Jay"
   ],
   "stocks": {
+    "2409": {
+      "name": "友達",
+      "lots": [
+        {
+          "id": 10,
+          "date": "2026-06-01",
+          "type": "buy",
+          "shares": 2000,
+          "total": 48920,
+          "broker": "新光",
+          "operator": "Jay"
+        }
+      ],
+      "dividends": [],
+      "currentPrice": 0,
+      "annualDividend": 0,
+      "priceUpdated": ""
+    },
     "3481": {
       "name": "群創",
       "lots": [
@@ -118,6 +136,6 @@
       "priceUpdated": "2026/6/4 21:18:51"
     }
   },
-  "nextId": 10,
+  "nextId": 11,
   "_saved": true
 }
