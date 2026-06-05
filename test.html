@@ -1463,7 +1463,7 @@ function render(){
         <td><span class="badge badge-op">${l.operator||"--"}</span></td>
         <td><span class="tag ${isSell?"tag-sell":"tag-buy"}">${isSell?"賣出":"買進"}</span></td>
         <td>${fmt(l.shares)} 股</td>
-        <td>${fmt(Math.round(l.price))} 元</td>
+        <td>${fmtP(l.price)} 元</td>
         <td class="${spc}" style="font-size:12px">${l.spnl!==null?fmtS(l.spnl)+" 元":"--"}</td>
         <td><div class="action-cell">
           <button class="btn btn-sm btn-warn" onclick="oM('edit-tx:${l.id}')"><i class="ti ti-edit"></i></button>
@@ -1487,8 +1487,8 @@ function render(){
       const rc=r.pnl>0?"gain":r.pnl<0?"loss":"";
       return `<tr>
         <td>${r.sellDate}</td><td>${fmt(r.sellShares)} 股</td>
-        <td>${fmt(Math.round(r.sellPrice))} 元</td>
-        <td>${fmt(Math.round(r.buyAvgCost))} 元</td>
+        <td>${fmtP(r.sellPrice)} 元</td>
+        <td>${fmtP(r.buyAvgCost)} 元</td>
         <td class="${rc}" style="font-weight:500">${fmtS(r.pnl)} 元</td>
         <td><input type="number" step="any" placeholder="輸入" value="${r.sellIncome??''}"
           style="width:100px;padding:3px 7px;border-radius:var(--r);border:.5px solid var(--border2);background:var(--surface);color:var(--text);font-size:12px"
