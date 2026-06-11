@@ -22,15 +22,6 @@
           "total": 46816,
           "broker": "永豐",
           "operator": "我"
-        },
-        {
-          "id": 152,
-          "date": "2026-06-11",
-          "type": "buy",
-          "shares": 46006,
-          "total": 0,
-          "broker": "永豐",
-          "operator": "我"
         }
       ],
       "dividends": [],
