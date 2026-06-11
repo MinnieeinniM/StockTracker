@@ -1448,8 +1448,16 @@ function render(){
       .forEach(sell=>{
         const spp=sell.total/sell.shares;
         let left=sell.shares,costSum=0;
+        // 同天買賣優先（當沖先扣）
+        for(let b of buyQ2){
+          if(!left)break;
+          if(b.date!==sell.date||b.rem===0)continue;
+          const take=Math.min(b.rem,left);costSum+=take*b.cpp;b.rem-=take;left-=take;
+        }
+        // 再依 FIFO 消耗早於賣出日的批次
         while(left>0&&buyQ2.length>0){
           const b=buyQ2[0];if(b.rem===0){buyQ2.shift();continue;}
+          if(b.date>=sell.date){break;}
           const take=Math.min(b.rem,left);costSum+=take*b.cpp;b.rem-=take;left-=take;
           if(b.rem===0) buyQ2.shift();
         }
@@ -1723,6 +1731,8 @@ window.handleStockSearch=async(q)=>{
 };
 
 window.handleSearchKey=(e)=>{
+  // 忽略修飾鍵本身，不干擾 Shift 切換輸入法
+  if(e.key==='Shift'||e.key==='Control'||e.key==='Alt'||e.key==='Meta')return;
   const el=document.getElementById('autocomplete-list');
   if(!el||el.style.display==='none')return;
   if(e.key==='ArrowDown'){e.preventDefault();_acIdx=Math.min(_acIdx+1,_acItems.length-1);highlightAc();}
