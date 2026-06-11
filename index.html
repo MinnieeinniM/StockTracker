@@ -123,6 +123,21 @@ th.sortable .sort-icon{font-size:10px;margin-left:3px;opacity:.5}
 th.sortable.sort-asc .sort-icon::after{content:'▲';opacity:1}
 th.sortable.sort-desc .sort-icon::after{content:'▼';opacity:1}
 th.sortable:not(.sort-asc):not(.sort-desc) .sort-icon::after{content:'⇅'}
+/* type toggle buttons */
+.type-toggle{display:flex;gap:8px;margin-top:2px}
+.type-btn{flex:1;padding:8px 12px;border-radius:var(--r);border:1.5px solid var(--border2);background:var(--surface2);color:var(--text2);font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;transition:all .15s;text-align:center}
+.type-btn.active-buy{background:#fcebeb;border-color:#f7c1c1;color:#a32d2d;font-weight:600}
+.type-btn.active-sell{background:#eaf3de;border-color:#c0dd97;color:#3b6d11;font-weight:600}
+@media(prefers-color-scheme:dark){
+  .type-btn.active-buy{background:#2d0e0e;border-color:#791f1f;color:#f09595}
+  .type-btn.active-sell{background:#162004;border-color:#3b6d11;color:#97c459}
+}
+/* shares quick buttons */
+.shares-quick{display:flex;gap:4px;margin-top:5px;flex-wrap:wrap}
+.shares-qbtn{padding:3px 9px;font-size:12px;border-radius:999px;border:.5px solid var(--border2);background:var(--surface2);color:var(--text2);cursor:pointer;font-family:inherit;white-space:nowrap}
+.shares-qbtn:hover{background:var(--info-bg);color:var(--info-t);border-color:var(--info-bd)}
+.shares-qbtn.minus{color:var(--danger-t)}
+.shares-qbtn.minus:hover{background:var(--danger-bg);border-color:var(--danger-bd)}
 /* smart date input */
 .date-input-wrap{display:flex;flex-direction:column;gap:5px}
 .date-input-native{width:100%;padding:7px 10px;border-radius:var(--r);border:.5px solid var(--border2);background:var(--surface);color:var(--text);font-size:14px;font-family:inherit;cursor:pointer}
@@ -310,11 +325,15 @@ function getLots(ticker, filterBroker, filterOp){
     .sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id)
     .map(l=>({...l,rem:l.shares,cpp:l.total/l.shares}));
   // 賣出：也只消耗符合篩選的賣出
+  // 同天買賣：優先消耗與賣出同日的買入批次（當沖先扣）
   lots.filter(l=>l.type==="sell"&&match(l))
     .sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id)
     .forEach(sell=>{
       let left=sell.shares;
-      for(let b of buyQ){if(!left)break;const take=Math.min(b.rem,left);b.rem-=take;left-=take;}
+      // 先消耗同天買入
+      for(let b of buyQ){if(!left)break;if(b.date!==sell.date)continue;const take=Math.min(b.rem,left);b.rem-=take;left-=take;}
+      // 再消耗早於賣出日的買入（FIFO）
+      for(let b of buyQ){if(!left)break;if(b.date>=sell.date)continue;const take=Math.min(b.rem,left);b.rem-=take;left-=take;}
     });
   return buyQ.filter(b=>b.rem>0).map(b=>({...b,shares:b.rem}));
 }
@@ -355,9 +374,18 @@ function calcRealizedPnl(ticker,filterBroker,filterOp){
     .forEach(sell=>{
       const spp=sell.total/sell.shares;
       let left=sell.shares,costSum=0;
+      // 同天買賣優先（當沖先扣）
+      for(let b of buyQ){
+        if(!left)break;
+        if(b.date!==sell.date||b.rem===0)continue;
+        const take=Math.min(b.rem,left);
+        costSum+=take*b.cpp; b.rem-=take; left-=take;
+      }
+      // 再依 FIFO 消耗早於賣出日的批次
       while(left>0&&buyQ.length>0){
         const b=buyQ[0];
         if(b.rem===0){buyQ.shift();continue;}
+        if(b.date>=sell.date){break;}
         const take=Math.min(b.rem,left);
         costSum+=take*b.cpp; b.rem-=take; left-=take;
         if(b.rem===0) buyQ.shift();
@@ -762,10 +790,27 @@ function render(){
         </div>
         <div class="form-row"><label>交易日期</label>${smartDateHtml('m-tx-date',today())}</div>
         <div class="form-row"><label>類型</label>
-          <select id="m-tx-type"><option value="buy">買進</option><option value="sell">賣出</option></select></div>
-        <div class="form-row"><label>股數</label><input id="m-tx-shares" type="number" placeholder="0" value="1000" min="1"/></div>
-        <div class="form-row"><label>總金額（元）</label><input id="m-tx-total" type="number" placeholder="0"/>
-          <div class="hint-text">實際成交金額（含手續費亦可）</div></div>
+          <input type="hidden" id="m-tx-type" value="buy"/>
+          <div class="type-toggle">
+            <button type="button" class="type-btn active-buy" id="btn-tx-buy" onclick="setTxTypeStock('buy')">買進</button>
+            <button type="button" class="type-btn" id="btn-tx-sell" onclick="setTxTypeStock('sell')">賣出</button>
+          </div>
+        </div>
+        <div class="form-row"><label>股數</label>
+          <input id="m-tx-shares" type="number" placeholder="0" value="1000" min="1" oninput="calcTxTotalStock()"/>
+          <div class="shares-quick">
+            <button type="button" class="shares-qbtn" onclick="adjSharesStock(1000)">+1000</button>
+            <button type="button" class="shares-qbtn" onclick="adjSharesStock(100)">+100</button>
+            <button type="button" class="shares-qbtn minus" onclick="adjSharesStock(-100)">-100</button>
+            <button type="button" class="shares-qbtn minus" onclick="adjSharesStock(-1000)">-1000</button>
+          </div>
+        </div>
+        <div class="form-row"><label>單價（元/股，支援小數）</label>
+          <input id="m-tx-price" type="number" step="0.01" placeholder="0.00" oninput="calcTxTotalStock()"/>
+          <div class="hint-text">填單價後自動計算總金額</div>
+        </div>
+        <div class="form-row"><label>總金額（元）</label><input id="m-tx-total" type="number" step="0.01" placeholder="0"/>
+          <div class="hint-text">實際成交金額（含手續費亦可），亦可直接填寫</div></div>
       </div>
       <div class="modal-btns">
         <button class="btn" onclick="cM()">取消</button>
@@ -785,10 +830,28 @@ function render(){
           <select id="m-op">${operators.length?oOpts:'<option value="">先到設定新增操作人</option>'}</select></div>
       </div>
       <div class="form-row"><label>日期</label>${smartDateHtml('m-date',today())}</div>
-      <div class="form-row"><label>類型</label><select id="m-type"><option value="buy">買進</option><option value="sell">賣出</option></select></div>
-      <div class="form-row"><label>股數</label><input id="m-shares" type="number" placeholder="0" value="1000" min="1"/></div>
-      <div class="form-row"><label>總金額（元）</label><input id="m-total" type="number" placeholder="0"/>
-        <div class="hint-text">實際成交金額（含手續費亦可）</div></div>
+      <div class="form-row"><label>類型</label>
+        <input type="hidden" id="m-type" value="buy"/>
+        <div class="type-toggle">
+          <button type="button" class="type-btn active-buy" id="btn-buy" onclick="setTxType('buy')">買進</button>
+          <button type="button" class="type-btn" id="btn-sell" onclick="setTxType('sell')">賣出</button>
+        </div>
+      </div>
+      <div class="form-row"><label>股數</label>
+        <input id="m-shares" type="number" placeholder="0" value="1000" min="1" oninput="calcTxTotal()"/>
+        <div class="shares-quick">
+          <button type="button" class="shares-qbtn" onclick="adjShares(1000)">+1000</button>
+          <button type="button" class="shares-qbtn" onclick="adjShares(100)">+100</button>
+          <button type="button" class="shares-qbtn minus" onclick="adjShares(-100)">-100</button>
+          <button type="button" class="shares-qbtn minus" onclick="adjShares(-1000)">-1000</button>
+        </div>
+      </div>
+      <div class="form-row"><label>單價（元/股，支援小數）</label>
+        <input id="m-price" type="number" step="0.01" placeholder="0.00" oninput="calcTxTotal()"/>
+        <div class="hint-text">填單價後自動計算總金額</div>
+      </div>
+      <div class="form-row"><label>總金額（元）</label><input id="m-total" type="number" step="0.01" placeholder="0"/>
+        <div class="hint-text">實際成交金額（含手續費亦可），亦可直接填寫</div></div>
       <div class="modal-btns"><button class="btn" onclick="cM()">取消</button>
         <button class="btn btn-primary" onclick="doAddTx()">確認</button></div>
     </div></div>`;
@@ -799,6 +862,7 @@ function render(){
     if(tx){
       const bOpts=brokers.map(b=>`<option${b===tx.broker?" selected":""}>${b}</option>`).join("");
       const oOpts=operators.map(o=>`<option${o===tx.operator?" selected":""}>${o}</option>`).join("");
+      const editPriceVal=(tx.total&&tx.shares)?(tx.total/tx.shares).toFixed(2):"";
       mHtml=`<div class="overlay" onclick="cM(event)"><div class="modal" onclick="event.stopPropagation()">
         <h3><i class="ti ti-edit"></i> 編輯交易 — ${state.stocks[sel].name}</h3>
         <div style="display:flex;gap:8px">
@@ -806,11 +870,26 @@ function render(){
           <div class="form-row" style="flex:1"><label>操作人</label><select id="m-op">${oOpts}</select></div>
         </div>
         <div class="form-row"><label>日期</label>${smartDateHtml('m-date',tx.date)}</div>
-        <div class="form-row"><label>類型</label><select id="m-type">
-          <option value="buy"${tx.type==="buy"?" selected":""}>買進</option>
-          <option value="sell"${tx.type==="sell"?" selected":""}>賣出</option></select></div>
-        <div class="form-row"><label>股數</label><input id="m-shares" type="number" value="${tx.shares}" min="1"/></div>
-        <div class="form-row"><label>總金額（元）</label><input id="m-total" type="number" value="${tx.total}"/></div>
+        <div class="form-row"><label>類型</label>
+          <input type="hidden" id="m-type" value="${tx.type}"/>
+          <div class="type-toggle">
+            <button type="button" class="type-btn${tx.type==="buy"?" active-buy":""}" id="btn-buy" onclick="setTxType('buy')">買進</button>
+            <button type="button" class="type-btn${tx.type==="sell"?" active-sell":""}" id="btn-sell" onclick="setTxType('sell')">賣出</button>
+          </div>
+        </div>
+        <div class="form-row"><label>股數</label>
+          <input id="m-shares" type="number" value="${tx.shares}" min="1" oninput="calcTxTotal()"/>
+          <div class="shares-quick">
+            <button type="button" class="shares-qbtn" onclick="adjShares(1000)">+1000</button>
+            <button type="button" class="shares-qbtn" onclick="adjShares(100)">+100</button>
+            <button type="button" class="shares-qbtn minus" onclick="adjShares(-100)">-100</button>
+            <button type="button" class="shares-qbtn minus" onclick="adjShares(-1000)">-1000</button>
+          </div>
+        </div>
+        <div class="form-row"><label>單價（元/股，支援小數）</label>
+          <input id="m-price" type="number" step="0.01" value="${editPriceVal}" oninput="calcTxTotal()"/>
+        </div>
+        <div class="form-row"><label>總金額（元）</label><input id="m-total" type="number" step="0.01" value="${tx.total}"/></div>
         <div class="modal-btns">
           <button class="btn btn-danger btn-sm" onclick="delTx(${txId})"><i class="ti ti-trash"></i></button>
           <button class="btn" onclick="cM()">取消</button>
@@ -1369,8 +1448,16 @@ function render(){
       .forEach(sell=>{
         const spp=sell.total/sell.shares;
         let left=sell.shares,costSum=0;
+        // 同天買賣優先（當沖先扣）
+        for(let b of buyQ2){
+          if(!left)break;
+          if(b.date!==sell.date||b.rem===0)continue;
+          const take=Math.min(b.rem,left);costSum+=take*b.cpp;b.rem-=take;left-=take;
+        }
+        // 再依 FIFO 消耗早於賣出日的批次
         while(left>0&&buyQ2.length>0){
           const b=buyQ2[0];if(b.rem===0){buyQ2.shift();continue;}
+          if(b.date>=sell.date){break;}
           const take=Math.min(b.rem,left);costSum+=take*b.cpp;b.rem-=take;left-=take;
           if(b.rem===0) buyQ2.shift();
         }
@@ -1397,7 +1484,7 @@ function render(){
         <td><span class="badge badge-op">${l.operator||"--"}</span></td>
         <td><span class="tag ${isSell?"tag-sell":"tag-buy"}">${isSell?"賣出":"買進"}</span></td>
         <td>${fmt(l.shares)} 股</td>
-        <td>${fmt(Math.round(l.price))} 元</td>
+        <td>${fmtP(l.price)} 元</td>
         <td class="${spc}" style="font-size:12px">${l.spnl!==null?fmtS(l.spnl)+" 元":"--"}</td>
         <td><div class="action-cell">
           <button class="btn btn-sm btn-warn" onclick="oM('edit-tx:${l.id}')"><i class="ti ti-edit"></i></button>
@@ -1421,8 +1508,8 @@ function render(){
       const rc=r.pnl>0?"gain":r.pnl<0?"loss":"";
       return `<tr>
         <td>${r.sellDate}</td><td>${fmt(r.sellShares)} 股</td>
-        <td>${fmt(Math.round(r.sellPrice))} 元</td>
-        <td>${fmt(Math.round(r.buyAvgCost))} 元</td>
+        <td>${fmtP(r.sellPrice)} 元</td>
+        <td>${fmtP(r.buyAvgCost)} 元</td>
         <td class="${rc}" style="font-weight:500">${fmtS(r.pnl)} 元</td>
         <td><input type="number" step="any" placeholder="輸入" value="${r.sellIncome??''}"
           style="width:100px;padding:3px 7px;border-radius:var(--r);border:.5px solid var(--border2);background:var(--surface);color:var(--text);font-size:12px"
@@ -1644,6 +1731,8 @@ window.handleStockSearch=async(q)=>{
 };
 
 window.handleSearchKey=(e)=>{
+  // 忽略修飾鍵本身，不干擾 Shift 切換輸入法
+  if(e.key==='Shift'||e.key==='Control'||e.key==='Alt'||e.key==='Meta')return;
   const el=document.getElementById('autocomplete-list');
   if(!el||el.style.display==='none')return;
   if(e.key==='ArrowDown'){e.preventDefault();_acIdx=Math.min(_acIdx+1,_acItems.length-1);highlightAc();}
@@ -1685,6 +1774,48 @@ window.toggleRealizedDateSort=()=>{realizedDateSort=realizedDateSort==='desc'?'a
 window.updatePrice=v=>{if(!sel)return;const p=parseFloat(v);state.stocks[sel].currentPrice=isNaN(p)?0:p;save();render();};
 window.fetchPrices=fetchPrices;
 window.exportExcel=exportExcel;
+
+// ── 新增交易 helpers ──────────────────────────────────────
+window.setTxType=function(type){
+  document.getElementById('m-type').value=type;
+  const bb=document.getElementById('btn-buy');
+  const bs=document.getElementById('btn-sell');
+  if(bb)bb.className='type-btn'+(type==='buy'?' active-buy':'');
+  if(bs)bs.className='type-btn'+(type==='sell'?' active-sell':'');
+};
+window.setTxTypeStock=function(type){
+  document.getElementById('m-tx-type').value=type;
+  const bb=document.getElementById('btn-tx-buy');
+  const bs=document.getElementById('btn-tx-sell');
+  if(bb)bb.className='type-btn'+(type==='buy'?' active-buy':'');
+  if(bs)bs.className='type-btn'+(type==='sell'?' active-sell':'');
+};
+window.adjShares=function(delta){
+  const el=document.getElementById('m-shares');
+  if(!el)return;
+  const v=parseInt(el.value)||0;
+  el.value=Math.max(0,v+delta);
+  calcTxTotal();
+};
+window.adjSharesStock=function(delta){
+  const el=document.getElementById('m-tx-shares');
+  if(!el)return;
+  const v=parseInt(el.value)||0;
+  el.value=Math.max(0,v+delta);
+  calcTxTotalStock();
+};
+window.calcTxTotal=function(){
+  const shares=parseFloat(document.getElementById('m-shares')?.value)||0;
+  const price=parseFloat(document.getElementById('m-price')?.value)||0;
+  const totalEl=document.getElementById('m-total');
+  if(totalEl&&shares>0&&price>0) totalEl.value=(shares*price).toFixed(2);
+};
+window.calcTxTotalStock=function(){
+  const shares=parseFloat(document.getElementById('m-tx-shares')?.value)||0;
+  const price=parseFloat(document.getElementById('m-tx-price')?.value)||0;
+  const totalEl=document.getElementById('m-tx-total');
+  if(totalEl&&shares>0&&price>0) totalEl.value=(shares*price).toFixed(2);
+};
 
 window.doAddStock=()=>{
   const t=(document.getElementById('m-t').value||"").trim();
