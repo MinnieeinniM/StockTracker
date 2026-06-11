@@ -325,11 +325,15 @@ function getLots(ticker, filterBroker, filterOp){
     .sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id)
     .map(l=>({...l,rem:l.shares,cpp:l.total/l.shares}));
   // 賣出：也只消耗符合篩選的賣出
+  // 同天買賣：優先消耗與賣出同日的買入批次（當沖先扣）
   lots.filter(l=>l.type==="sell"&&match(l))
     .sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id)
     .forEach(sell=>{
       let left=sell.shares;
-      for(let b of buyQ){if(!left)break;const take=Math.min(b.rem,left);b.rem-=take;left-=take;}
+      // 先消耗同天買入
+      for(let b of buyQ){if(!left)break;if(b.date!==sell.date)continue;const take=Math.min(b.rem,left);b.rem-=take;left-=take;}
+      // 再消耗早於賣出日的買入（FIFO）
+      for(let b of buyQ){if(!left)break;if(b.date>=sell.date)continue;const take=Math.min(b.rem,left);b.rem-=take;left-=take;}
     });
   return buyQ.filter(b=>b.rem>0).map(b=>({...b,shares:b.rem}));
 }
@@ -370,9 +374,18 @@ function calcRealizedPnl(ticker,filterBroker,filterOp){
     .forEach(sell=>{
       const spp=sell.total/sell.shares;
       let left=sell.shares,costSum=0;
+      // 同天買賣優先（當沖先扣）
+      for(let b of buyQ){
+        if(!left)break;
+        if(b.date!==sell.date||b.rem===0)continue;
+        const take=Math.min(b.rem,left);
+        costSum+=take*b.cpp; b.rem-=take; left-=take;
+      }
+      // 再依 FIFO 消耗早於賣出日的批次
       while(left>0&&buyQ.length>0){
         const b=buyQ[0];
         if(b.rem===0){buyQ.shift();continue;}
+        if(b.date>=sell.date){break;}
         const take=Math.min(b.rem,left);
         costSum+=take*b.cpp; b.rem-=take; left-=take;
         if(b.rem===0) buyQ.shift();
