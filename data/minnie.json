@@ -651,7 +651,7 @@
         {
           "id": 147,
           "date": "2026-06-09",
-          "type": "buy",
+          "type": "sell",
           "shares": 1000,
           "total": 74881,
           "broker": "永豐",
