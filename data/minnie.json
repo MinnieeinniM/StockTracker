@@ -195,6 +195,24 @@
       "priceUpdated": "2026/6/5 13:43:42",
       "per": 36.54
     },
+    "2303": {
+      "name": "聯電",
+      "lots": [
+        {
+          "id": 150,
+          "date": "2026-06-08",
+          "type": "buy",
+          "shares": 1000,
+          "total": 122049,
+          "broker": "新光",
+          "operator": "媽"
+        }
+      ],
+      "dividends": [],
+      "currentPrice": 0,
+      "annualDividend": 0,
+      "priceUpdated": ""
+    },
     "2317": {
       "name": "鴻海",
       "lots": [
@@ -1522,6 +1540,6 @@
       "priceUpdated": "2026/6/5 13:43:42"
     }
   },
-  "nextId": 150,
+  "nextId": 151,
   "_saved": true
 }
