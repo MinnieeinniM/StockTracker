@@ -11,6 +11,24 @@
     "咘"
   ],
   "stocks": {
+    "1708": {
+      "name": "東鹼",
+      "lots": [
+        {
+          "id": 148,
+          "date": "2026-06-10",
+          "type": "buy",
+          "shares": 1000,
+          "total": 46816,
+          "broker": "永豐",
+          "operator": "我"
+        }
+      ],
+      "dividends": [],
+      "currentPrice": 0,
+      "annualDividend": 0,
+      "priceUpdated": ""
+    },
     "1727": {
       "name": "中華化",
       "lots": [
@@ -1495,6 +1513,6 @@
       "priceUpdated": "2026/6/5 13:43:42"
     }
   },
-  "nextId": 148,
+  "nextId": 149,
   "_saved": true
 }
