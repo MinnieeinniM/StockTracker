@@ -547,15 +547,6 @@
           "broker": "元富",
           "operator": "我",
           "reinvestAmount": null
-        },
-        {
-          "id": 172,
-          "date": "2025-03-18",
-          "amount": 315,
-          "note": "",
-          "broker": "元富",
-          "operator": "我",
-          "reinvestAmount": null
         }
       ],
       "currentPrice": 2400,
@@ -898,15 +889,6 @@
           "id": 174,
           "date": "2026-06-11",
           "amount": 2180,
-          "note": "",
-          "broker": "元富",
-          "operator": "媽",
-          "reinvestAmount": null
-        },
-        {
-          "id": 175,
-          "date": "2025-05-22",
-          "amount": 4180,
           "note": "",
           "broker": "元富",
           "operator": "媽",
@@ -1598,15 +1580,6 @@
         }
       ],
       "dividends": [
-        {
-          "id": 163,
-          "date": "2025-08-08",
-          "amount": 513,
-          "note": "",
-          "broker": "永豐",
-          "operator": "我",
-          "reinvestAmount": null
-        },
         {
           "id": 164,
           "date": "2026-02-11",
