@@ -599,6 +599,24 @@
       "priceUpdated": "2026/6/16 15:45:58",
       "per": 36.91
     },
+    "2454": {
+      "name": "聯發科",
+      "lots": [
+        {
+          "id": 160,
+          "date": "2026-06-16",
+          "type": "buy",
+          "shares": 10,
+          "total": 44463,
+          "broker": "永豐",
+          "operator": "我"
+        }
+      ],
+      "dividends": [],
+      "currentPrice": 0,
+      "annualDividend": 0,
+      "priceUpdated": ""
+    },
     "2472": {
       "name": "立隆電",
       "lots": [
@@ -1623,6 +1641,6 @@
       "priceUpdated": "2026/6/16 15:45:58"
     }
   },
-  "nextId": 160,
+  "nextId": 161,
   "_saved": true
 }
