@@ -318,17 +318,7 @@
           "operator": "媽"
         }
       ],
-      "dividends": [
-        {
-          "id": 176,
-          "date": "2025-07-02",
-          "amount": 6060,
-          "note": "",
-          "broker": "元富",
-          "operator": "媽",
-          "reinvestAmount": null
-        }
-      ],
+      "dividends": [],
       "currentPrice": 269,
       "annualDividend": 7.2,
       "priceUpdated": "2026/6/16 16:30:55",
@@ -553,15 +543,6 @@
           "id": 168,
           "date": "2026-03-17",
           "amount": 270,
-          "note": "",
-          "broker": "元富",
-          "operator": "我",
-          "reinvestAmount": null
-        },
-        {
-          "id": 169,
-          "date": "2025-12-11",
-          "amount": 225,
           "note": "",
           "broker": "元富",
           "operator": "我",
