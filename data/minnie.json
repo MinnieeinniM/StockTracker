@@ -549,15 +549,6 @@
           "reinvestAmount": null
         },
         {
-          "id": 171,
-          "date": "2025-06-12",
-          "amount": 202,
-          "note": "",
-          "broker": "元富",
-          "operator": "我",
-          "reinvestAmount": null
-        },
-        {
           "id": 172,
           "date": "2025-03-18",
           "amount": 315,
@@ -1028,15 +1019,6 @@
           "id": 173,
           "date": "2026-06-15",
           "amount": 4009,
-          "note": "",
-          "broker": "元富",
-          "operator": "我",
-          "reinvestAmount": null
-        },
-        {
-          "id": 177,
-          "date": "2025-06-17",
-          "amount": 4502,
           "note": "",
           "broker": "元富",
           "operator": "我",
