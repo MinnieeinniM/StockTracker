@@ -511,14 +511,7 @@
           "operator": "我"
         }
       ],
-      "dividends": [
-        {
-          "id": 10,
-          "date": "2024-07-18",
-          "amount": 2780,
-          "note": "2024Q2股利"
-        }
-      ],
+      "dividends": [],
       "currentPrice": 2400,
       "annualDividend": 21.9,
       "priceUpdated": "2026/6/16 16:30:55",
