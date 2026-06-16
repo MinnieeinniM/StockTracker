@@ -574,6 +574,15 @@
           "broker": "元富",
           "operator": "我",
           "reinvestAmount": null
+        },
+        {
+          "id": 172,
+          "date": "2025-03-18",
+          "amount": 315,
+          "note": "",
+          "broker": "元富",
+          "operator": "我",
+          "reinvestAmount": null
         }
       ],
       "currentPrice": 2400,
@@ -1728,6 +1737,6 @@
       "priceUpdated": "2026/6/16 16:30:55"
     }
   },
-  "nextId": 172,
+  "nextId": 173,
   "_saved": true
 }
