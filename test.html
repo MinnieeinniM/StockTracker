@@ -19,10 +19,10 @@
   --text:#0f1117;
   --text2:#5a5f6e;
   --text3:#9fa4b0;
-  --accent:#2563eb;
-  --accent-bg:#eff4ff;
-  --accent-bd:#bfcffd;
-  --accent-t:#1d4ed8;
+  --accent:#ff9d9d;
+  --accent-bg:#fdf8ee;
+  --accent-bd:#e8c96a;
+  --accent-t:#fff81f;
   --warn-bg:#fffbeb;--warn-t:#92400e;--warn-bd:#fde68a;
   --danger-bg:#fef2f2;--danger-t:#991b1b;--danger-bd:#fecaca;
   --success-bg:#f0fdf4;--success-t:#166534;--success-bd:#bbf7d0;
@@ -41,10 +41,10 @@
   --text:#e8eaf0;
   --text2:#8892a4;
   --text3:#4e566a;
-  --accent:#3b82f6;
-  --accent-bg:#0f1f3d;
-  --accent-bd:#1e3a7a;
-  --accent-t:#93c5fd;
+  --accent:#d4a017;
+  --accent-bg:#1f1700;
+  --accent-bd:#5a3e00;
+  --accent-t:#f0c040;
   --warn-bg:#1c1400;--warn-t:#fbbf24;--warn-bd:#78350f;
   --danger-bg:#1f0909;--danger-t:#fca5a5;--danger-bd:#7f1d1d;
   --success-bg:#051a0d;--success-t:#86efac;--success-bd:#14532d;
@@ -89,9 +89,9 @@ body{
 .btn:active{transform:translateY(0);box-shadow:var(--shadow-sm);opacity:.9}
 .btn-primary{
   background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;
-  box-shadow:0 2px 8px rgba(37,99,235,.25);
+  box-shadow:0 2px 8px rgba(184,134,11,.25);
 }
-.btn-primary:hover{background:#1d4ed8;border-color:#1d4ed8;box-shadow:0 4px 16px rgba(37,99,235,.35);}
+.btn-primary:hover{background:#92660a;border-color:#92660a;box-shadow:0 4px 16px rgba(184,134,11,.35);}
 .btn-sm{padding:5px 11px;font-size:12px;}
 .btn-danger{background:var(--danger-bg);border-color:var(--danger-bd);color:var(--danger-t);box-shadow:none;}
 .btn-warn{background:var(--warn-bg);border-color:var(--warn-bd);color:var(--warn-t);box-shadow:none;}
@@ -117,7 +117,7 @@ body{
 }
 .chip.active{
   background:var(--accent);border-color:var(--accent);color:#fff;
-  box-shadow:0 2px 6px rgba(37,99,235,.2);
+  box-shadow:0 2px 6px rgba(184,134,11,.2);
 }
 .chip:hover:not(.active){background:var(--surface3);border-color:var(--border2);}
 
@@ -145,7 +145,7 @@ body{
 }
 .stock-card::before{
   content:'';position:absolute;top:0;left:0;right:0;height:3px;
-  background:linear-gradient(90deg,var(--accent),#7c3aed);opacity:0;
+  background:linear-gradient(90deg,var(--accent),#d97706);opacity:0;
   transition:opacity .2s;
 }
 .stock-card:hover{
