@@ -423,6 +423,11 @@ async function loadState(){
       if(!l.broker) l.broker=s.broker||"";
       if(!l.operator) l.operator=s.operator||"";
     });
+    (s.dividends||[]).forEach(d=>{
+      if(d.broker===undefined) d.broker="";
+      if(d.operator===undefined) d.operator="";
+      if(d.reinvestAmount===undefined) d.reinvestAmount=null;
+    });
   });
 } // end loadState
 
@@ -452,6 +457,8 @@ let stockSearch="";
 let realizedYearFilter="全部";
 let realizedViewMode="group"; // "group" 按股票分組 | "date" 按日期排序
 let realizedDateSort="desc";  // "asc" 舊→新 | "desc" 新→舊
+let divYearFilter="全部";
+let divDateSort="desc";       // "asc" 舊→新 | "desc" 新→舊
 let priceLoading=false;
 let priceMsg="";
 let _stockListCache=null;
@@ -589,7 +596,20 @@ function totalCost(t,fb,fo){return getLots(t,fb,fo).reduce((a,l)=>a+l.cpp*l.shar
 function upnl(t,price,fb,fo){
   return getLots(t,fb,fo).reduce((a,l)=>a+(price*(1-FEE_RATE)-l.cpp)*l.shares,0);
 }
-function divTotal(t){return (state.stocks[t].dividends||[]).reduce((a,d)=>a+d.amount,0);}
+function divTotal(t,fb,fo){
+  return (state.stocks[t].dividends||[]).filter(d=>{
+    if(fb&&fb!=="全部"&&(d.broker||"")!==fb) return false;
+    if(fo&&fo!=="全部"&&(d.operator||"")!==fo) return false;
+    return true;
+  }).reduce((a,d)=>a+d.amount,0);
+}
+function reinvestTotal(t,fb,fo){
+  return (state.stocks[t].dividends||[]).filter(d=>{
+    if(fb&&fb!=="全部"&&(d.broker||"")!==fb) return false;
+    if(fo&&fo!=="全部"&&(d.operator||"")!==fo) return false;
+    return true;
+  }).reduce((a,d)=>a+(d.reinvestAmount||0),0);
+}
 function yld(ann,price){return price>0?((ann/price)*100).toFixed(2):"-";}
 function fmt(n){return Math.round(n).toLocaleString('zh-TW');}
 function fmtP(n){
@@ -670,6 +690,20 @@ function allRealizedPnl(fb,fo){
     }
   });
   return{rows,grandTotal:Math.round(grandTotal)};
+}
+
+// 全部股票股利紀錄（已依券商/操作人篩選），每筆附上 ticker/name
+function allDividends(fb,fo){
+  const rows=[];
+  Object.keys(state.stocks).forEach(t=>{
+    const s=state.stocks[t];
+    (s.dividends||[]).forEach(d=>{
+      if(fb&&fb!=="全部"&&(d.broker||"")!==fb) return;
+      if(fo&&fo!=="全部"&&(d.operator||"")!==fo) return;
+      rows.push({...d,ticker:t,name:s.name});
+    });
+  });
+  return rows;
 }
 
 // 取得一個 ticker 下所有不重複的 brokers/operators
@@ -993,8 +1027,9 @@ function exportExcel(){
     r.push(["日期","券商","操作人","類型","股數","總金額(元)","單價(元)"]);
     (s.lots||[]).slice().reverse().forEach(l=>
       r.push([l.date,l.broker||"",l.operator||"",l.type==="buy"?"買進":"賣出",l.shares,l.total,Math.round(l.total/l.shares)]));
-    r.push([]);r.push(["─ 股利紀錄 ─"]);r.push(["日期","金額(元)","備註"]);
-    (s.dividends||[]).slice().reverse().forEach(d=>r.push([d.date,d.amount,d.note||""]));
+    r.push([]);r.push(["─ 股利紀錄 ─"]);r.push(["日期","券商","操作人","金額(元)","再投入金額(元)","備註"]);
+    (s.dividends||[]).slice().sort((a,b)=>b.date.localeCompare(a.date)||(b.id-a.id))
+      .forEach(d=>r.push([d.date,d.broker||"",d.operator||"",d.amount,d.reinvestAmount||"",d.note||""]));
     r.push(["累計股利",divTotal(t)]);
     const ws=XLSX.utils.aoa_to_sheet(r);
     ws['!cols']=[14,8,8,8,10,14,20].map(w=>({wch:w}));
@@ -1156,16 +1191,57 @@ function render(){
     }
 
   } else if(modal==="add-div"){
+    const bOpts=brokers.map(b=>`<option>${b}</option>`).join("");
+    const oOpts=operators.map(o=>`<option>${o}</option>`).join("");
     mHtml=`<div class="overlay" onclick="cM(event)"><div class="modal" onclick="event.stopPropagation()">
-      <h3>新增股利 — ${state.stocks[sel].name}</h3>
+      <h3><i class="ti ti-coin"></i> 新增股利 — ${state.stocks[sel].name}</h3>
+      <div style="display:flex;gap:8px">
+        <div class="form-row" style="flex:1"><label>券商</label>
+          <select id="m-br">${brokers.length?bOpts:'<option value="">先到設定新增券商</option>'}</select></div>
+        <div class="form-row" style="flex:1"><label>操作人</label>
+          <select id="m-op">${operators.length?oOpts:'<option value="">先到設定新增操作人</option>'}</select></div>
+      </div>
       <div class="form-row"><label>日期</label>${smartDateHtml('m-date',today())}</div>
-      <div class="form-row"><label>金額（元）</label><input id="m-amount" type="number" placeholder="0"/></div>
+      <div class="form-row"><label>股利金額（元）</label><input id="m-amount" type="number" placeholder="0"/></div>
+      <div class="modal-section">
+        <div class="modal-section-title"><i class="ti ti-recycle"></i> 股利再投入（選填）</div>
+        <div class="form-row"><label>再投入金額（元）</label><input id="m-reinvest" type="number" placeholder="0"/>
+          <div class="hint-text">若此筆股利已部分或全部用於買回股票，可記錄再投入金額；實際買進可至「交易紀錄」分頁新增</div></div>
+      </div>
       <div class="form-row"><label>備註</label><input id="m-note" placeholder="例：2024Q2股利"/></div>
       <div class="form-row"><label>同步更新年化股利（元/股）</label>
         <input id="m-ann" type="number" placeholder="${state.stocks[sel].annualDividend||0}"/></div>
       <div class="modal-btns"><button class="btn" onclick="cM()">取消</button>
         <button class="btn btn-primary" onclick="doAddDiv()">確認</button></div>
     </div></div>`;
+
+  } else if(modal&&modal.startsWith("edit-div:")){
+    const divId=parseInt(modal.split(":")[1]);
+    const dv=(state.stocks[sel].dividends||[]).find(d=>d.id===divId);
+    if(dv){
+      const bOpts=brokers.map(b=>`<option${b===dv.broker?" selected":""}>${b}</option>`).join("");
+      const oOpts=operators.map(o=>`<option${o===dv.operator?" selected":""}>${o}</option>`).join("");
+      const noteEsc=(dv.note||"").replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+      mHtml=`<div class="overlay" onclick="cM(event)"><div class="modal" onclick="event.stopPropagation()">
+        <h3><i class="ti ti-edit"></i> 編輯股利 — ${state.stocks[sel].name}</h3>
+        <div style="display:flex;gap:8px">
+          <div class="form-row" style="flex:1"><label>券商</label><select id="m-br">${bOpts}</select></div>
+          <div class="form-row" style="flex:1"><label>操作人</label><select id="m-op">${oOpts}</select></div>
+        </div>
+        <div class="form-row"><label>日期</label>${smartDateHtml('m-date',dv.date)}</div>
+        <div class="form-row"><label>股利金額（元）</label><input id="m-amount" type="number" value="${dv.amount}"/></div>
+        <div class="modal-section">
+          <div class="modal-section-title"><i class="ti ti-recycle"></i> 股利再投入（選填）</div>
+          <div class="form-row"><label>再投入金額（元）</label><input id="m-reinvest" type="number" value="${dv.reinvestAmount??''}" placeholder="0"/></div>
+        </div>
+        <div class="form-row"><label>備註</label><input id="m-note" value="${noteEsc}"/></div>
+        <div class="modal-btns">
+          <button class="btn btn-danger btn-sm" onclick="delDiv(${divId})"><i class="ti ti-trash"></i></button>
+          <button class="btn" onclick="cM()">取消</button>
+          <button class="btn btn-primary" onclick="doEditDiv(${divId})">儲存</button>
+        </div>
+      </div></div>`;
+    }
 
   } else if(modal==="edit-stock"){
     const s=state.stocks[sel];
@@ -1369,6 +1445,7 @@ function render(){
         ${ghSyncBtn}
         <button class="btn btn-sm" onclick="goUnrealized()"><i class="ti ti-trending-up"></i> 未實現損益</button>
         <button class="btn btn-sm" onclick="goRealized()"><i class="ti ti-chart-bar"></i> 已實現損益</button>
+        <button class="btn btn-sm" onclick="goAllDividends()"><i class="ti ti-coin"></i> 股利紀錄</button>
         <button class="btn btn-sm" onclick="exportExcel()"><i class="ti ti-download"></i> 匯出 Excel</button>
         <button class="btn btn-sm" onclick="oM('manage-settings')"><i class="ti ti-settings"></i> 設定</button>
         <button class="btn btn-primary btn-sm" onclick="oM('add-stock')"><i class="ti ti-plus"></i> 新增股票</button>
@@ -1651,6 +1728,80 @@ function render(){
     return;
   }
 
+  // ── ALL DIVIDENDS VIEW ───────────────────────────────────
+  if(view==="alldividends"){
+    const fb=brokerFilter,fo=operatorFilter;
+    let rows=allDividends(fb,fo);
+
+    // 收集所有出現過的年份
+    const allYears=[...new Set(rows.map(r=>r.date.slice(0,4)))].sort((a,b)=>b-a);
+    const fy=divYearFilter;
+    if(fy!=="全部") rows=rows.filter(r=>r.date.startsWith(fy));
+
+    rows.sort((a,b)=>{
+      const cmp=a.date.localeCompare(b.date)||(a.id-b.id);
+      return divDateSort==='asc'?cmp:-cmp;
+    });
+
+    const grandAmount=Math.round(rows.reduce((a,r)=>a+r.amount,0));
+    const grandReinvest=Math.round(rows.reduce((a,r)=>a+(r.reinvestAmount||0),0));
+
+    const filterHtml=`<div class="filter-section">
+      <div class="filter-row">
+        <span class="filter-label">券商</span>
+        ${allBr.map(b=>`<span class="chip${fb===b?" active":""}" onclick="setBroker('${b}')">${b}</span>`).join("")}
+      </div>
+      <div class="filter-row" style="margin-top:6px">
+        <span class="filter-label">操作人</span>
+        ${allOp.map(o=>`<span class="chip${fo===o?" active":""}" onclick="setOperator('${o}')">${o}</span>`).join("")}
+      </div>
+      ${allYears.length>0?`<div class="filter-row" style="margin-top:6px">
+        <span class="filter-label">年份</span>
+        ${["全部",...allYears].map(y=>`<span class="chip${fy===y?" active":""}" onclick="setDivYear('${y}')">${y==="全部"?"全部":y+" 年"}</span>`).join("")}
+      </div>`:""}
+    </div>`;
+
+    const tableRows=rows.length===0
+      ?`<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--text3)">${fy!=="全部"||fb!=="全部"||fo!=="全部"?"此篩選條件下無股利記錄":"尚無股利記錄，可至個股頁面的「股利紀錄」分頁新增"}</td></tr>`
+      :rows.map(r=>`<tr style="cursor:pointer" onclick="openDetail('${r.ticker}')">
+          <td>${r.date}</td>
+          <td><strong>${r.name}</strong> <span style="color:var(--text2);font-size:12px">${r.ticker}</span></td>
+          <td><span class="badge badge-broker">${r.broker||"--"}</span></td>
+          <td><span class="badge badge-op">${r.operator||"--"}</span></td>
+          <td style="font-weight:500">+${fmt(r.amount)} 元</td>
+          <td>${r.reinvestAmount?fmt(r.reinvestAmount)+" 元":"--"}</td>
+          <td style="color:var(--text2)">${r.note||""}</td>
+          <td><div class="action-cell">
+            <button class="btn btn-sm btn-warn" onclick="event.stopPropagation();openEditDiv(${r.id},'${r.ticker}')"><i class="ti ti-edit"></i></button>
+            <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();delDiv(${r.id},'${r.ticker}')"><i class="ti ti-trash"></i></button>
+          </div></td>
+        </tr>`).join("");
+
+    app.innerHTML=`
+      <div class="topbar">
+        <button class="btn btn-sm" onclick="backList()"><i class="ti ti-arrow-left"></i> 返回</button>
+        <h1><i class="ti ti-coin"></i> 所有股利紀錄${fy!=="全部"?` — ${fy} 年`:""}</h1>
+      </div>
+      ${filterHtml}
+      <div class="sc-row">
+        <div class="sc"><div class="sc-label">股利合計</div><div class="sc-val" style="color:var(--warn-t)">${fmt(grandAmount)} 元</div></div>
+        <div class="sc"><div class="sc-label">已再投入合計</div><div class="sc-val">${fmt(grandReinvest)} 元</div></div>
+        <div class="sc"><div class="sc-label">筆數</div><div class="sc-val">${rows.length} 筆</div></div>
+      </div>
+      <div class="panel">
+        <table><thead><tr>
+          <th class="sortable ${divDateSort==='desc'?'sort-desc':'sort-asc'}" onclick="toggleDivDateSort()" style="cursor:pointer;user-select:none">日期<span class="sort-icon"></span></th>
+          <th>股票</th><th>券商</th><th>操作人</th><th>股利金額</th><th>再投入金額</th><th>備註</th><th>操作</th>
+        </tr></thead>
+        <tbody>${tableRows}</tbody>
+        ${rows.length?`<tfoot><tr class="sum-row"><td colspan="4">合計 ${rows.length} 筆${fy!=="全部"?" ("+fy+" 年)":""}</td>
+          <td>${fmt(grandAmount)} 元</td><td>${grandReinvest?fmt(grandReinvest)+" 元":"--"}</td><td colspan="2"></td></tr></tfoot>`:""}
+        </table>
+      </div>
+      ${mHtml}`;
+    return;
+  }
+
   // ── DETAIL VIEW ─────────────────────────────────────────
   const s=state.stocks[sel];
   const price=s.currentPrice||0;
@@ -1660,7 +1811,8 @@ function render(){
   const cost=totalCost(sel,fb,fo);
   const pnl=upnl(sel,price,fb,fo);
   const pc=pnl>0?"gain":pnl<0?"loss":"";
-  const dt=divTotal(sel);
+  const dt=divTotal(sel,fb,fo);
+  const drt=reinvestTotal(sel,fb,fo);
   const y=yld(s.annualDividend,price);
   const {total:rpnl,records:rpnlRec}=calcRealizedPnl(sel,fb,fo);
   const rpc=rpnl>0?"gain":rpnl<0?"loss":"";
@@ -1750,14 +1902,28 @@ function render(){
       </tr>`;
     }).join("");
 
-  const divRows=(s.dividends||[]).length===0
-    ?`<div class="empty" style="padding:2rem">尚無股利記錄</div>`
-    :(s.dividends||[]).slice().reverse().map(d=>`<div class="div-item">
-        <span style="color:var(--text2)">${d.date}</span>
-        <span style="flex:1">${d.note||""}</span>
-        <span style="font-weight:500">+${fmt(d.amount)} 元</span>
-        <button class="btn btn-sm btn-danger" onclick="delDiv(${d.id})"><i class="ti ti-trash"></i></button>
-      </div>`).join("");
+  // 股利紀錄（依券商/操作人篩選，新到舊排序）
+  const divFiltered=(s.dividends||[]).filter(d=>{
+    if(fb&&fb!=="全部"&&(d.broker||"")!==fb) return false;
+    if(fo&&fo!=="全部"&&(d.operator||"")!==fo) return false;
+    return true;
+  }).slice().sort((a,b)=>b.date.localeCompare(a.date)||(b.id-a.id));
+  const divAmountSum=divFiltered.reduce((a,d)=>a+d.amount,0);
+  const divReinvestSum=divFiltered.reduce((a,d)=>a+(d.reinvestAmount||0),0);
+  const divRows=divFiltered.length===0
+    ?`<tr><td colspan="7" style="text-align:center;padding:1.5rem;color:var(--text3)">尚無股利記錄</td></tr>`
+    :divFiltered.map(d=>`<tr>
+        <td>${d.date}</td>
+        <td><span class="badge badge-broker">${d.broker||"--"}</span></td>
+        <td><span class="badge badge-op">${d.operator||"--"}</span></td>
+        <td style="font-weight:500">+${fmt(d.amount)} 元</td>
+        <td>${d.reinvestAmount?fmt(d.reinvestAmount)+" 元":"--"}</td>
+        <td style="color:var(--text2)">${d.note||""}</td>
+        <td><div class="action-cell">
+          <button class="btn btn-sm btn-warn" onclick="oM('edit-div:${d.id}')"><i class="ti ti-edit"></i></button>
+          <button class="btn btn-sm btn-danger" onclick="delDiv(${d.id})"><i class="ti ti-trash"></i></button>
+        </div></td>
+      </tr>`).join("");
 
   const rpnlRows=rpnlRec.length===0
     ?`<tr><td colspan="6" style="text-align:center;padding:1.5rem;color:var(--text3)">尚無賣出記錄</td></tr>`
@@ -1826,9 +1992,13 @@ function render(){
       <tbody>${rpnlRows}</tbody>
       <tfoot><tr class="sum-row"><td colspan="4">合計已實現損益</td>
         <td class="${rpc}" style="font-weight:600">${fmtS(rpnl)} 元</td><td></td></tr></tfoot></table>`
-    :`<div>${divRows}</div>
-      <div style="margin-top:12px;font-size:13px;color:var(--text2);border-top:.5px solid var(--border);padding-top:10px">
-        累計股利：<strong>${fmt(dt)} 元</strong></div>`;
+    :`<table><thead><tr>
+        <th>日期</th><th>券商</th><th>操作人</th><th>股利金額</th><th>再投入金額</th><th>備註</th><th>操作</th>
+      </tr></thead>
+      <tbody>${divRows}</tbody>
+      ${divFiltered.length?`<tfoot><tr class="sum-row"><td colspan="3">合計 ${divFiltered.length} 筆</td>
+        <td>${fmt(divAmountSum)} 元</td><td>${divReinvestSum?fmt(divReinvestSum)+" 元":"--"}</td><td colspan="2"></td></tr></tfoot>`:""}
+      </table>`;
 
   const addBtn=activeTab==="dividends"
     ?`<button class="btn btn-primary btn-sm" onclick="oM('add-div')"><i class="ti ti-plus"></i> 新增股利</button>`
@@ -1858,6 +2028,7 @@ function render(){
       <div class="sc"><div class="sc-label">未實現損益</div><div class="sc-val ${pc}">${price?fmtS(Math.round(pnl))+" 元":"--"}${price&&cost>0?`<div style="font-size:13px;margin-top:2px">${fmtS(Math.round(pnl/cost*10000)/100)}%</div>`:"" }</div></div>
       <div class="sc"><div class="sc-label">已實現損益</div><div class="sc-val ${rpc}">${rpnlRec.length?fmtS(rpnl)+" 元":"--"}</div></div>
       <div class="sc"><div class="sc-label">累計股利</div><div class="sc-val" style="color:var(--warn-t)">${fmt(dt)} 元</div></div>
+      <div class="sc"><div class="sc-label">已再投入</div><div class="sc-val">${fmt(drt)} 元</div></div>
     </div>
     <div class="panel">
       <div class="ph">
@@ -2124,9 +2295,28 @@ window.doAddDiv=()=>{
   const amount=parseFloat(document.getElementById('m-amount').value)||0;
   const note=(document.getElementById('m-note').value||"").trim();
   const ann=parseFloat(document.getElementById('m-ann').value);
+  const br=(document.getElementById('m-br')?document.getElementById('m-br').value:"");
+  const op=(document.getElementById('m-op')?document.getElementById('m-op').value:"");
+  const reinvestRaw=document.getElementById('m-reinvest')?document.getElementById('m-reinvest').value:"";
+  const reinvestAmount=reinvestRaw===""?null:(parseFloat(reinvestRaw)||0);
   if(!date||amount<=0){alert("請填寫完整資訊");return;}
-  state.stocks[sel].dividends.push({id:state.nextId++,date,amount,note});
+  state.stocks[sel].dividends.push({id:state.nextId++,date,amount,note,broker:br,operator:op,reinvestAmount});
   if(!isNaN(ann)) state.stocks[sel].annualDividend=ann;
+  save();modal=null;render();
+};
+
+window.doEditDiv=id=>{
+  const t=sel;
+  const date=getSmartDate('m-date');
+  const amount=parseFloat(document.getElementById('m-amount').value)||0;
+  const note=(document.getElementById('m-note').value||"").trim();
+  const br=(document.getElementById('m-br')?document.getElementById('m-br').value:"");
+  const op=(document.getElementById('m-op')?document.getElementById('m-op').value:"");
+  const reinvestRaw=document.getElementById('m-reinvest')?document.getElementById('m-reinvest').value:"";
+  const reinvestAmount=reinvestRaw===""?null:(parseFloat(reinvestRaw)||0);
+  if(!date||amount<=0){alert("請填寫完整資訊");return;}
+  const idx=(state.stocks[t].dividends||[]).findIndex(d=>d.id===id);
+  if(idx>=0) state.stocks[t].dividends[idx]={...state.stocks[t].dividends[idx],date,amount,note,broker:br,operator:op,reinvestAmount};
   save();modal=null;render();
 };
 
@@ -2146,11 +2336,17 @@ window.delTx=id=>{
   save();modal=null;render();
 };
 
-window.delDiv=id=>{
+window.delDiv=(id,ticker)=>{
+  const t=ticker||sel;
   if(!confirm("確定刪除此筆股利？"))return;
-  state.stocks[sel].dividends=(state.stocks[sel].dividends||[]).filter(d=>d.id!==id);
+  state.stocks[t].dividends=(state.stocks[t].dividends||[]).filter(d=>d.id!==id);
   save();render();
 };
+
+window.openEditDiv=(id,ticker)=>{sel=ticker;modal='edit-div:'+id;render();};
+window.goAllDividends=()=>{view="alldividends";render();};
+window.setDivYear=y=>{divYearFilter=y;render();};
+window.toggleDivDateSort=()=>{divDateSort=divDateSort==='desc'?'asc':'desc';render();};
 
 window.doAddBroker=()=>{
   const v=(document.getElementById('m-br-new').value||"").trim();
