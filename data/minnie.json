@@ -517,6 +517,12 @@
           "date": "2026-01-08",
           "amount": 100,
           "note": ""
+        },
+        {
+          "id": 166,
+          "date": "2026-04-09",
+          "amount": 120,
+          "note": ""
         }
       ],
       "currentPrice": 2400,
@@ -1665,6 +1671,6 @@
       "priceUpdated": "2026/6/16 16:30:55"
     }
   },
-  "nextId": 166,
+  "nextId": 167,
   "_saved": true
 }
