@@ -1022,7 +1022,17 @@
           "operator": "我"
         }
       ],
-      "dividends": [],
+      "dividends": [
+        {
+          "id": 173,
+          "date": "2026-06-15",
+          "amount": 4009,
+          "note": "",
+          "broker": "元富",
+          "operator": "我",
+          "reinvestAmount": null
+        }
+      ],
       "currentPrice": 83,
       "annualDividend": 4,
       "priceUpdated": "2026/6/16 16:30:55",
@@ -1737,6 +1747,6 @@
       "priceUpdated": "2026/6/16 16:30:55"
     }
   },
-  "nextId": 173,
+  "nextId": 174,
   "_saved": true
 }
