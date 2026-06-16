@@ -920,7 +920,17 @@
           "sellIncome": 29968
         }
       ],
-      "dividends": [],
+      "dividends": [
+        {
+          "id": 174,
+          "date": "2026-06-11",
+          "amount": 2180,
+          "note": "",
+          "broker": "元富",
+          "operator": "媽",
+          "reinvestAmount": null
+        }
+      ],
       "currentPrice": 53.3,
       "annualDividend": 1,
       "priceUpdated": "2026/6/16 16:30:55",
@@ -1747,6 +1757,6 @@
       "priceUpdated": "2026/6/16 16:30:55"
     }
   },
-  "nextId": 174,
+  "nextId": 175,
   "_saved": true
 }
