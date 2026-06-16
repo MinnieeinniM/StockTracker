@@ -511,7 +511,14 @@
           "operator": "我"
         }
       ],
-      "dividends": [],
+      "dividends": [
+        {
+          "id": 165,
+          "date": "2026-01-08",
+          "amount": 100,
+          "note": ""
+        }
+      ],
       "currentPrice": 2400,
       "annualDividend": 21.9,
       "priceUpdated": "2026/6/16 16:30:55",
@@ -1658,6 +1665,6 @@
       "priceUpdated": "2026/6/16 16:30:55"
     }
   },
-  "nextId": 165,
+  "nextId": 166,
   "_saved": true
 }
