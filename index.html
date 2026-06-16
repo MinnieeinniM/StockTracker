@@ -19,10 +19,10 @@
   --text:#0f1117;
   --text2:#5a5f6e;
   --text3:#9fa4b0;
-  --accent:#2563eb;
+  --accent:#ffae00;
   --accent-bg:#eff4ff;
   --accent-bd:#bfcffd;
-  --accent-t:#1d4ed8;
+  --accent-t:#d88a1d;
   --warn-bg:#fffbeb;--warn-t:#92400e;--warn-bd:#fde68a;
   --danger-bg:#fef2f2;--danger-t:#991b1b;--danger-bd:#fecaca;
   --success-bg:#f0fdf4;--success-t:#166534;--success-bd:#bbf7d0;
@@ -41,10 +41,10 @@
   --text:#e8eaf0;
   --text2:#8892a4;
   --text3:#4e566a;
-  --accent:#3b82f6;
-  --accent-bg:#0f1f3d;
-  --accent-bd:#1e3a7a;
-  --accent-t:#93c5fd;
+  --accent:#f6833b;
+  --accent-bg:#ff7057;
+  --accent-bd:#ff9868;
+  --accent-t:#fdc493;
   --warn-bg:#1c1400;--warn-t:#fbbf24;--warn-bd:#78350f;
   --danger-bg:#1f0909;--danger-t:#fca5a5;--danger-bd:#7f1d1d;
   --success-bg:#051a0d;--success-t:#86efac;--success-bd:#14532d;
@@ -89,9 +89,9 @@ body{
 .btn:active{transform:translateY(0);box-shadow:var(--shadow-sm);opacity:.9}
 .btn-primary{
   background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;
-  box-shadow:0 2px 8px rgba(37,99,235,.25);
+  box-shadow:0 2px 8px rgba(184,134,11,.25);
 }
-.btn-primary:hover{background:#1d4ed8;border-color:#1d4ed8;box-shadow:0 4px 16px rgba(37,99,235,.35);}
+.btn-primary:hover{background:#92660a;border-color:#92660a;box-shadow:0 4px 16px rgba(184,134,11,.35);}
 .btn-sm{padding:5px 11px;font-size:12px;}
 .btn-danger{background:var(--danger-bg);border-color:var(--danger-bd);color:var(--danger-t);box-shadow:none;}
 .btn-warn{background:var(--warn-bg);border-color:var(--warn-bd);color:var(--warn-t);box-shadow:none;}
@@ -117,7 +117,7 @@ body{
 }
 .chip.active{
   background:var(--accent);border-color:var(--accent);color:#fff;
-  box-shadow:0 2px 6px rgba(37,99,235,.2);
+  box-shadow:0 2px 6px rgba(184,134,11,.2);
 }
 .chip:hover:not(.active){background:var(--surface3);border-color:var(--border2);}
 
@@ -145,7 +145,7 @@ body{
 }
 .stock-card::before{
   content:'';position:absolute;top:0;left:0;right:0;height:3px;
-  background:linear-gradient(90deg,var(--accent),#7c3aed);opacity:0;
+  background:linear-gradient(90deg,var(--accent),#d97706);opacity:0;
   transition:opacity .2s;
 }
 .stock-card:hover{
@@ -548,30 +548,39 @@ window.writeToGitHub=writeToGitHub;
 
 // 取得 FIFO 後剩餘持股批次，可依 broker/operator 篩選
 // filterBroker/filterOp: undefined 或 "全部" = 不篩選
+// 注意：賣出只消耗同一券商的買入（券商間庫存獨立）
 function getLots(ticker, filterBroker, filterOp){
   const s=state.stocks[ticker];
   const lots=s.lots||[];
-  const match=l=>{
-    if(filterBroker&&filterBroker!=="全部"&&l.broker!==filterBroker) return false;
-    if(filterOp&&filterOp!=="全部"&&l.operator!==filterOp) return false;
+  const matchBroker=l=>!filterBroker||filterBroker==="全部"||l.broker===filterBroker;
+  const matchOp=l=>!filterOp||filterOp==="全部"||l.operator===filterOp;
+
+  // 取得所有券商（在篩選範圍內）
+  const brokersInScope=[...new Set(lots.map(l=>l.broker||""))].filter(br=>{
+    if(filterBroker&&filterBroker!=="全部") return br===(filterBroker||"");
     return true;
-  };
-  // 買入：只算符合篩選的批次
-  let buyQ=lots.filter(l=>l.type==="buy"&&match(l))
-    .sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id)
-    .map(l=>({...l,rem:l.shares,cpp:l.total/l.shares}));
-  // 賣出：也只消耗符合篩選的賣出
-  // 同天買賣：優先消耗與賣出同日的買入批次（當沖先扣）
-  lots.filter(l=>l.type==="sell"&&match(l))
-    .sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id)
-    .forEach(sell=>{
-      let left=sell.shares;
-      // 先消耗同天買入
-      for(let b of buyQ){if(!left)break;if(b.date!==sell.date)continue;const take=Math.min(b.rem,left);b.rem-=take;left-=take;}
-      // 再消耗早於賣出日的買入（FIFO）
-      for(let b of buyQ){if(!left)break;if(b.date>=sell.date)continue;const take=Math.min(b.rem,left);b.rem-=take;left-=take;}
-    });
-  return buyQ.filter(b=>b.rem>0).map(b=>({...b,shares:b.rem}));
+  });
+
+  // 每個券商獨立做 FIFO，再合併剩餘持股
+  const allRemaining=[];
+  brokersInScope.forEach(br=>{
+    // 該券商的買入批次
+    let buyQ=lots.filter(l=>l.type==="buy"&&(l.broker||"")=== br&&matchOp(l))
+      .sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id)
+      .map(l=>({...l,rem:l.shares,cpp:l.total/l.shares}));
+    // 該券商的賣出（操作人可篩選）
+    lots.filter(l=>l.type==="sell"&&(l.broker||"")=== br&&matchOp(l))
+      .sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id)
+      .forEach(sell=>{
+        let left=sell.shares;
+        // 先消耗同天買入（當沖先扣）
+        for(let b of buyQ){if(!left)break;if(b.date!==sell.date)continue;const take=Math.min(b.rem,left);b.rem-=take;left-=take;}
+        // 再消耗早於賣出日的買入（FIFO）
+        for(let b of buyQ){if(!left)break;if(b.date>=sell.date)continue;const take=Math.min(b.rem,left);b.rem-=take;left-=take;}
+      });
+    buyQ.filter(b=>b.rem>0).forEach(b=>allRemaining.push({...b,shares:b.rem}));
+  });
+  return allRemaining;
 }
 
 function totalShares(t,fb,fo){return getLots(t,fb,fo).reduce((a,l)=>a+l.shares,0);}
@@ -592,48 +601,60 @@ function fmtS(n){return(n>=0?"+":"")+fmt(n);}
 function today(){return new Date().toISOString().slice(0,10);}
 
 // 已實現損益（FIFO），可篩選 broker/operator
+// 注意：賣出只消耗同一券商的買入（券商間庫存獨立）
 function calcRealizedPnl(ticker,filterBroker,filterOp){
   const s=state.stocks[ticker];
   const lots=s.lots||[];
-  const match=l=>{
-    if(filterBroker&&filterBroker!=="全部"&&l.broker!==filterBroker) return false;
-    if(filterOp&&filterOp!=="全部"&&l.operator!==filterOp) return false;
+  const matchOp=l=>!filterOp||filterOp==="全部"||l.operator===filterOp;
+
+  // 取得所有券商（在篩選範圍內）
+  const brokersInScope=[...new Set(lots.map(l=>l.broker||""))].filter(br=>{
+    if(filterBroker&&filterBroker!=="全部") return br===(filterBroker||"");
     return true;
-  };
-  const buyQ=lots.filter(l=>l.type==="buy"&&match(l))
-    .sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id)
-    .map(l=>({...l,rem:l.shares,cpp:l.total/l.shares}));
+  });
+
   const records=[];
   let total=0;
-  lots.filter(l=>l.type==="sell"&&match(l))
-    .sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id)
-    .forEach(sell=>{
-      const spp=sell.total/sell.shares;
-      let left=sell.shares,costSum=0;
-      // 同天買賣優先（當沖先扣）
-      for(let b of buyQ){
-        if(!left)break;
-        if(b.date!==sell.date||b.rem===0)continue;
-        const take=Math.min(b.rem,left);
-        costSum+=take*b.cpp; b.rem-=take; left-=take;
-      }
-      // 再依 FIFO 消耗早於賣出日的批次
-      while(left>0&&buyQ.length>0){
-        const b=buyQ[0];
-        if(b.rem===0){buyQ.shift();continue;}
-        if(b.date>=sell.date){break;}
-        const take=Math.min(b.rem,left);
-        costSum+=take*b.cpp; b.rem-=take; left-=take;
-        if(b.rem===0) buyQ.shift();
-      }
-      const matched=sell.shares-left;
-      if(matched>0){
-        const avgCost=costSum/matched;
-        const pnl=(spp-avgCost)*matched;
-        total+=pnl;
-        records.push({sellDate:sell.date,sellShares:matched,sellPrice:spp,buyAvgCost:avgCost,pnl:Math.round(pnl),sellId:sell.id,sellIncome:sell.sellIncome??null});
-      }
-    });
+
+  // 每個券商獨立做 FIFO 已實現計算
+  brokersInScope.forEach(br=>{
+    const buyQ=lots.filter(l=>l.type==="buy"&&(l.broker||"")=== br&&matchOp(l))
+      .sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id)
+      .map(l=>({...l,rem:l.shares,cpp:l.total/l.shares}));
+
+    lots.filter(l=>l.type==="sell"&&(l.broker||"")=== br&&matchOp(l))
+      .sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id)
+      .forEach(sell=>{
+        const spp=sell.total/sell.shares;
+        let left=sell.shares,costSum=0;
+        // 同天買賣優先（當沖先扣）
+        for(let b of buyQ){
+          if(!left)break;
+          if(b.date!==sell.date||b.rem===0)continue;
+          const take=Math.min(b.rem,left);
+          costSum+=take*b.cpp; b.rem-=take; left-=take;
+        }
+        // 再依 FIFO 消耗早於賣出日的批次
+        while(left>0&&buyQ.length>0){
+          const b=buyQ[0];
+          if(b.rem===0){buyQ.shift();continue;}
+          if(b.date>=sell.date){break;}
+          const take=Math.min(b.rem,left);
+          costSum+=take*b.cpp; b.rem-=take; left-=take;
+          if(b.rem===0) buyQ.shift();
+        }
+        const matched=sell.shares-left;
+        if(matched>0){
+          const avgCost=costSum/matched;
+          const pnl=(spp-avgCost)*matched;
+          total+=pnl;
+          records.push({sellDate:sell.date,sellShares:matched,sellPrice:spp,buyAvgCost:avgCost,pnl:Math.round(pnl),sellId:sell.id,sellIncome:sell.sellIncome??null,broker:br});
+        }
+      });
+  });
+
+  // 依賣出日期排序
+  records.sort((a,b)=>a.sellDate.localeCompare(b.sellDate));
   return {total:Math.round(total),records};
 }
 
