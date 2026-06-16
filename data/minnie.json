@@ -40,6 +40,15 @@
           "total": 46066,
           "broker": "永豐",
           "operator": "我"
+        },
+        {
+          "id": 157,
+          "date": "2026-06-12",
+          "type": "sell",
+          "shares": 1000,
+          "total": 47092,
+          "broker": "永豐",
+          "operator": "我"
         }
       ],
       "dividends": [],
@@ -1596,6 +1605,6 @@
       "priceUpdated": "2026/6/16 15:35:07"
     }
   },
-  "nextId": 157,
+  "nextId": 158,
   "_saved": true
 }
