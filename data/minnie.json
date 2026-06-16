@@ -582,6 +582,15 @@
           "total": 13865,
           "broker": "阿母",
           "operator": "媽"
+        },
+        {
+          "id": 159,
+          "date": "2026-06-15",
+          "type": "buy",
+          "shares": 150,
+          "total": 42435,
+          "broker": "永豐",
+          "operator": "我"
         }
       ],
       "dividends": [],
@@ -681,17 +690,8 @@
           "date": "2026-06-15",
           "type": "sell",
           "shares": 10,
-          "total": 44005,
-          "broker": "永豐",
-          "operator": "我"
-        },
-        {
-          "id": 159,
-          "date": "2026-06-16",
-          "type": "sell",
-          "shares": 2,
-          "total": 9678,
-          "broker": "永豐",
+          "total": 44006,
+          "broker": "新光",
           "operator": "我"
         }
       ],
