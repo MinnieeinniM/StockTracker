@@ -929,6 +929,15 @@
           "broker": "元富",
           "operator": "媽",
           "reinvestAmount": null
+        },
+        {
+          "id": 175,
+          "date": "2025-05-22",
+          "amount": 4180,
+          "note": "",
+          "broker": "元富",
+          "operator": "媽",
+          "reinvestAmount": null
         }
       ],
       "currentPrice": 53.3,
@@ -1757,6 +1766,6 @@
       "priceUpdated": "2026/6/16 16:30:55"
     }
   },
-  "nextId": 175,
+  "nextId": 176,
   "_saved": true
 }
