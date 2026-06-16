@@ -516,13 +516,19 @@
           "id": 165,
           "date": "2026-01-08",
           "amount": 100,
-          "note": ""
+          "note": "",
+          "broker": "",
+          "operator": "",
+          "reinvestAmount": null
         },
         {
           "id": 166,
           "date": "2026-04-09",
           "amount": 120,
-          "note": ""
+          "note": "",
+          "broker": "永豐",
+          "operator": "我",
+          "reinvestAmount": null
         }
       ],
       "currentPrice": 2400,
@@ -1540,13 +1546,19 @@
           "id": 163,
           "date": "2025-08-08",
           "amount": 513,
-          "note": ""
+          "note": "",
+          "broker": "",
+          "operator": "",
+          "reinvestAmount": null
         },
         {
           "id": 164,
           "date": "2026-02-11",
           "amount": 2911,
-          "note": ""
+          "note": "",
+          "broker": "",
+          "operator": "",
+          "reinvestAmount": null
         }
       ],
       "currentPrice": 105.9,
