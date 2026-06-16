@@ -1556,8 +1556,8 @@
           "date": "2026-02-11",
           "amount": 2911,
           "note": "",
-          "broker": "",
-          "operator": "",
+          "broker": "永豐",
+          "operator": "我",
           "reinvestAmount": null
         }
       ],
