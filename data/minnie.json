@@ -318,7 +318,17 @@
           "operator": "媽"
         }
       ],
-      "dividends": [],
+      "dividends": [
+        {
+          "id": 176,
+          "date": "2025-07-02",
+          "amount": 6060,
+          "note": "",
+          "broker": "元富",
+          "operator": "媽",
+          "reinvestAmount": null
+        }
+      ],
       "currentPrice": 269,
       "annualDividend": 7.2,
       "priceUpdated": "2026/6/16 16:30:55",
@@ -1766,6 +1776,6 @@
       "priceUpdated": "2026/6/16 16:30:55"
     }
   },
-  "nextId": 176,
+  "nextId": 177,
   "_saved": true
 }
