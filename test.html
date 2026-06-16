@@ -548,30 +548,39 @@ window.writeToGitHub=writeToGitHub;
 
 // 取得 FIFO 後剩餘持股批次，可依 broker/operator 篩選
 // filterBroker/filterOp: undefined 或 "全部" = 不篩選
+// 注意：賣出只消耗同一券商的買入（券商間庫存獨立）
 function getLots(ticker, filterBroker, filterOp){
   const s=state.stocks[ticker];
   const lots=s.lots||[];
-  const match=l=>{
-    if(filterBroker&&filterBroker!=="全部"&&l.broker!==filterBroker) return false;
-    if(filterOp&&filterOp!=="全部"&&l.operator!==filterOp) return false;
+  const matchBroker=l=>!filterBroker||filterBroker==="全部"||l.broker===filterBroker;
+  const matchOp=l=>!filterOp||filterOp==="全部"||l.operator===filterOp;
+
+  // 取得所有券商（在篩選範圍內）
+  const brokersInScope=[...new Set(lots.map(l=>l.broker||""))].filter(br=>{
+    if(filterBroker&&filterBroker!=="全部") return br===(filterBroker||"");
     return true;
-  };
-  // 買入：只算符合篩選的批次
-  let buyQ=lots.filter(l=>l.type==="buy"&&match(l))
-    .sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id)
-    .map(l=>({...l,rem:l.shares,cpp:l.total/l.shares}));
-  // 賣出：也只消耗符合篩選的賣出
-  // 同天買賣：優先消耗與賣出同日的買入批次（當沖先扣）
-  lots.filter(l=>l.type==="sell"&&match(l))
-    .sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id)
-    .forEach(sell=>{
-      let left=sell.shares;
-      // 先消耗同天買入
-      for(let b of buyQ){if(!left)break;if(b.date!==sell.date)continue;const take=Math.min(b.rem,left);b.rem-=take;left-=take;}
-      // 再消耗早於賣出日的買入（FIFO）
-      for(let b of buyQ){if(!left)break;if(b.date>=sell.date)continue;const take=Math.min(b.rem,left);b.rem-=take;left-=take;}
-    });
-  return buyQ.filter(b=>b.rem>0).map(b=>({...b,shares:b.rem}));
+  });
+
+  // 每個券商獨立做 FIFO，再合併剩餘持股
+  const allRemaining=[];
+  brokersInScope.forEach(br=>{
+    // 該券商的買入批次
+    let buyQ=lots.filter(l=>l.type==="buy"&&(l.broker||"")=== br&&matchOp(l))
+      .sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id)
+      .map(l=>({...l,rem:l.shares,cpp:l.total/l.shares}));
+    // 該券商的賣出（操作人可篩選）
+    lots.filter(l=>l.type==="sell"&&(l.broker||"")=== br&&matchOp(l))
+      .sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id)
+      .forEach(sell=>{
+        let left=sell.shares;
+        // 先消耗同天買入（當沖先扣）
+        for(let b of buyQ){if(!left)break;if(b.date!==sell.date)continue;const take=Math.min(b.rem,left);b.rem-=take;left-=take;}
+        // 再消耗早於賣出日的買入（FIFO）
+        for(let b of buyQ){if(!left)break;if(b.date>=sell.date)continue;const take=Math.min(b.rem,left);b.rem-=take;left-=take;}
+      });
+    buyQ.filter(b=>b.rem>0).forEach(b=>allRemaining.push({...b,shares:b.rem}));
+  });
+  return allRemaining;
 }
 
 function totalShares(t,fb,fo){return getLots(t,fb,fo).reduce((a,l)=>a+l.shares,0);}
@@ -592,48 +601,60 @@ function fmtS(n){return(n>=0?"+":"")+fmt(n);}
 function today(){return new Date().toISOString().slice(0,10);}
 
 // 已實現損益（FIFO），可篩選 broker/operator
+// 注意：賣出只消耗同一券商的買入（券商間庫存獨立）
 function calcRealizedPnl(ticker,filterBroker,filterOp){
   const s=state.stocks[ticker];
   const lots=s.lots||[];
-  const match=l=>{
-    if(filterBroker&&filterBroker!=="全部"&&l.broker!==filterBroker) return false;
-    if(filterOp&&filterOp!=="全部"&&l.operator!==filterOp) return false;
+  const matchOp=l=>!filterOp||filterOp==="全部"||l.operator===filterOp;
+
+  // 取得所有券商（在篩選範圍內）
+  const brokersInScope=[...new Set(lots.map(l=>l.broker||""))].filter(br=>{
+    if(filterBroker&&filterBroker!=="全部") return br===(filterBroker||"");
     return true;
-  };
-  const buyQ=lots.filter(l=>l.type==="buy"&&match(l))
-    .sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id)
-    .map(l=>({...l,rem:l.shares,cpp:l.total/l.shares}));
+  });
+
   const records=[];
   let total=0;
-  lots.filter(l=>l.type==="sell"&&match(l))
-    .sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id)
-    .forEach(sell=>{
-      const spp=sell.total/sell.shares;
-      let left=sell.shares,costSum=0;
-      // 同天買賣優先（當沖先扣）
-      for(let b of buyQ){
-        if(!left)break;
-        if(b.date!==sell.date||b.rem===0)continue;
-        const take=Math.min(b.rem,left);
-        costSum+=take*b.cpp; b.rem-=take; left-=take;
-      }
-      // 再依 FIFO 消耗早於賣出日的批次
-      while(left>0&&buyQ.length>0){
-        const b=buyQ[0];
-        if(b.rem===0){buyQ.shift();continue;}
-        if(b.date>=sell.date){break;}
-        const take=Math.min(b.rem,left);
-        costSum+=take*b.cpp; b.rem-=take; left-=take;
-        if(b.rem===0) buyQ.shift();
-      }
-      const matched=sell.shares-left;
-      if(matched>0){
-        const avgCost=costSum/matched;
-        const pnl=(spp-avgCost)*matched;
-        total+=pnl;
-        records.push({sellDate:sell.date,sellShares:matched,sellPrice:spp,buyAvgCost:avgCost,pnl:Math.round(pnl),sellId:sell.id,sellIncome:sell.sellIncome??null});
-      }
-    });
+
+  // 每個券商獨立做 FIFO 已實現計算
+  brokersInScope.forEach(br=>{
+    const buyQ=lots.filter(l=>l.type==="buy"&&(l.broker||"")=== br&&matchOp(l))
+      .sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id)
+      .map(l=>({...l,rem:l.shares,cpp:l.total/l.shares}));
+
+    lots.filter(l=>l.type==="sell"&&(l.broker||"")=== br&&matchOp(l))
+      .sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id)
+      .forEach(sell=>{
+        const spp=sell.total/sell.shares;
+        let left=sell.shares,costSum=0;
+        // 同天買賣優先（當沖先扣）
+        for(let b of buyQ){
+          if(!left)break;
+          if(b.date!==sell.date||b.rem===0)continue;
+          const take=Math.min(b.rem,left);
+          costSum+=take*b.cpp; b.rem-=take; left-=take;
+        }
+        // 再依 FIFO 消耗早於賣出日的批次
+        while(left>0&&buyQ.length>0){
+          const b=buyQ[0];
+          if(b.rem===0){buyQ.shift();continue;}
+          if(b.date>=sell.date){break;}
+          const take=Math.min(b.rem,left);
+          costSum+=take*b.cpp; b.rem-=take; left-=take;
+          if(b.rem===0) buyQ.shift();
+        }
+        const matched=sell.shares-left;
+        if(matched>0){
+          const avgCost=costSum/matched;
+          const pnl=(spp-avgCost)*matched;
+          total+=pnl;
+          records.push({sellDate:sell.date,sellShares:matched,sellPrice:spp,buyAvgCost:avgCost,pnl:Math.round(pnl),sellId:sell.id,sellIncome:sell.sellIncome??null,broker:br});
+        }
+      });
+  });
+
+  // 依賣出日期排序
+  records.sort((a,b)=>a.sellDate.localeCompare(b.sellDate));
   return {total:Math.round(total),records};
 }
 
