@@ -639,6 +639,15 @@
           "total": 0,
           "broker": "阿母",
           "operator": "媽"
+        },
+        {
+          "id": 182,
+          "date": "2026-06-22",
+          "type": "sell",
+          "shares": 1000,
+          "total": 2734,
+          "broker": "阿母",
+          "operator": "媽"
         }
       ],
       "dividends": [],
@@ -1748,6 +1757,6 @@
       "priceUpdated": "2026/6/24 00:54:19"
     }
   },
-  "nextId": 182,
+  "nextId": 183,
   "_saved": true
 }
