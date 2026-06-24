@@ -936,6 +936,15 @@
           "total": 68597,
           "broker": "元富",
           "operator": "媽"
+        },
+        {
+          "id": 184,
+          "date": "2026-06-24",
+          "type": "sell",
+          "shares": 1000,
+          "total": 72289,
+          "broker": "元富",
+          "operator": "媽"
         }
       ],
       "dividends": [
@@ -1766,6 +1775,6 @@
       "priceUpdated": "2026/6/24 17:08:44"
     }
   },
-  "nextId": 184,
+  "nextId": 185,
   "_saved": true
 }
