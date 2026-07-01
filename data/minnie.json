@@ -1007,7 +1007,8 @@
           "shares": 1000,
           "total": 70189,
           "broker": "元富",
-          "operator": "媽"
+          "operator": "媽",
+          "sellIncome": 70189
         }
       ],
       "dividends": [
