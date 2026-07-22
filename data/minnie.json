@@ -666,6 +666,15 @@
           "total": 2734,
           "broker": "阿母",
           "operator": "媽"
+        },
+        {
+          "id": 200,
+          "date": "2026-07-17",
+          "type": "buy",
+          "shares": 50,
+          "total": 14345,
+          "broker": "永豐",
+          "operator": "我"
         }
       ],
       "dividends": [],
@@ -1897,6 +1906,6 @@
       "priceUpdated": "2026/7/17 20:05:03"
     }
   },
-  "nextId": 200,
+  "nextId": 201,
   "_saved": true
 }
