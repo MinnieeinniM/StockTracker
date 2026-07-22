@@ -1215,6 +1215,33 @@ function render(){
         <button class="btn btn-primary" onclick="doAddDiv()">確認</button></div>
     </div></div>`;
 
+  } else if(modal==="add-div-global"){
+    const bOpts=brokers.map(b=>`<option>${b}</option>`).join("");
+    const oOpts=operators.map(o=>`<option>${o}</option>`).join("");
+    const stockList=Object.keys(state.stocks).sort();
+    const stOpts=stockList.map(t=>`<option value="${t}">${t} ${state.stocks[t].name}</option>`).join("");
+    mHtml=`<div class="overlay" onclick="cM(event)"><div class="modal" onclick="event.stopPropagation()">
+      <h3><i class="ti ti-coin"></i> 新增股利</h3>
+      <div class="form-row"><label>股票</label>
+        <select id="m-stock">${stockList.length?stOpts:'<option value="">尚無股票，請先新增股票</option>'}</select></div>
+      <div style="display:flex;gap:8px">
+        <div class="form-row" style="flex:1"><label>券商</label>
+          <select id="m-br">${brokers.length?bOpts:'<option value="">先到設定新增券商</option>'}</select></div>
+        <div class="form-row" style="flex:1"><label>操作人</label>
+          <select id="m-op">${operators.length?oOpts:'<option value="">先到設定新增操作人</option>'}</select></div>
+      </div>
+      <div class="form-row"><label>日期</label>${smartDateHtml('m-date',today())}</div>
+      <div class="form-row"><label>股利金額（元）</label><input id="m-amount" type="number" placeholder="0"/></div>
+      <div class="modal-section">
+        <div class="modal-section-title"><i class="ti ti-recycle"></i> 股利再投入（選填）</div>
+        <div class="form-row"><label>再投入金額（元）</label><input id="m-reinvest" type="number" placeholder="0"/>
+          <div class="hint-text">若此筆股利已部分或全部用於買回股票，可記錄再投入金額；實際買進可至「交易紀錄」分頁新增</div></div>
+      </div>
+      <div class="form-row"><label>備註</label><input id="m-note" placeholder="例：2024Q2股利"/></div>
+      <div class="modal-btns"><button class="btn" onclick="cM()">取消</button>
+        <button class="btn btn-primary" onclick="doAddDivGlobal()">確認</button></div>
+    </div></div>`;
+
   } else if(modal&&modal.startsWith("edit-div:")){
     const divId=parseInt(modal.split(":")[1]);
     const dv=(state.stocks[sel].dividends||[]).find(d=>d.id===divId);
@@ -1762,7 +1789,7 @@ function render(){
     </div>`;
 
     const tableRows=rows.length===0
-      ?`<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--text3)">${fy!=="全部"||fb!=="全部"||fo!=="全部"?"此篩選條件下無股利記錄":"尚無股利記錄，可至個股頁面的「股利紀錄」分頁新增"}</td></tr>`
+      ?`<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--text3)">${fy!=="全部"||fb!=="全部"||fo!=="全部"?"此篩選條件下無股利記錄":"尚無股利記錄，可點右上「新增股利」或至個股頁面的「股利紀錄」分頁新增"}</td></tr>`
       :rows.map(r=>`<tr style="cursor:pointer" onclick="openDetail('${r.ticker}')">
           <td>${r.date}</td>
           <td><strong>${r.name}</strong> <span style="color:var(--text2);font-size:12px">${r.ticker}</span></td>
@@ -1781,6 +1808,7 @@ function render(){
       <div class="topbar">
         <button class="btn btn-sm" onclick="backList()"><i class="ti ti-arrow-left"></i> 返回</button>
         <h1><i class="ti ti-coin"></i> 所有股利紀錄${fy!=="全部"?` — ${fy} 年`:""}</h1>
+        <button class="btn btn-primary btn-sm" onclick="oM('add-div-global')"><i class="ti ti-plus"></i> 新增股利</button>
       </div>
       ${filterHtml}
       <div class="sc-row">
@@ -2302,6 +2330,22 @@ window.doAddDiv=()=>{
   if(!date||amount<=0){alert("請填寫完整資訊");return;}
   state.stocks[sel].dividends.push({id:state.nextId++,date,amount,note,broker:br,operator:op,reinvestAmount});
   if(!isNaN(ann)) state.stocks[sel].annualDividend=ann;
+  save();modal=null;render();
+};
+
+window.doAddDivGlobal=()=>{
+  const t=document.getElementById('m-stock')?document.getElementById('m-stock').value:"";
+  if(!t||!state.stocks[t]){alert("請選擇股票");return;}
+  const date=getSmartDate('m-date');
+  const amount=parseFloat(document.getElementById('m-amount').value)||0;
+  const note=(document.getElementById('m-note').value||"").trim();
+  const br=(document.getElementById('m-br')?document.getElementById('m-br').value:"");
+  const op=(document.getElementById('m-op')?document.getElementById('m-op').value:"");
+  const reinvestRaw=document.getElementById('m-reinvest')?document.getElementById('m-reinvest').value:"";
+  const reinvestAmount=reinvestRaw===""?null:(parseFloat(reinvestRaw)||0);
+  if(!date||amount<=0){alert("請填寫完整資訊");return;}
+  if(!state.stocks[t].dividends) state.stocks[t].dividends=[];
+  state.stocks[t].dividends.push({id:state.nextId++,date,amount,note,broker:br,operator:op,reinvestAmount});
   save();modal=null;render();
 };
 
