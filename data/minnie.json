@@ -1070,7 +1070,10 @@
           "id": 197,
           "date": "2026-07-10",
           "amount": 2170,
-          "note": ""
+          "note": "",
+          "broker": "新光",
+          "operator": "我",
+          "reinvestAmount": null
         }
       ],
       "currentPrice": 50.7,
@@ -1440,7 +1443,10 @@
           "id": 198,
           "date": "2026-07-03",
           "amount": 2990,
-          "note": ""
+          "note": "",
+          "broker": "",
+          "operator": "",
+          "reinvestAmount": null
         }
       ],
       "currentPrice": 200.5,
