@@ -959,6 +959,24 @@
       "priceUpdated": "2026/7/29 20:04:45",
       "per": 25.53
     },
+    "3090": {
+      "name": "日電貿",
+      "lots": [
+        {
+          "id": 221,
+          "date": "2026-08-07",
+          "type": "buy",
+          "shares": 1000,
+          "total": 150561,
+          "broker": "新光",
+          "operator": "媽"
+        }
+      ],
+      "dividends": [],
+      "currentPrice": 0,
+      "annualDividend": 0,
+      "priceUpdated": ""
+    },
     "3231": {
       "name": "緯創",
       "lots": [
@@ -2090,6 +2108,6 @@
       "priceUpdated": "2026/7/29 20:04:45"
     }
   },
-  "nextId": 221,
+  "nextId": 222,
   "_saved": true
 }
