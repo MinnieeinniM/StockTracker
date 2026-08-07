@@ -613,15 +613,6 @@
           "reinvestAmount": null
         },
         {
-          "id": 167,
-          "date": "2026-06-11",
-          "amount": 270,
-          "note": "",
-          "broker": "元富",
-          "operator": "我",
-          "reinvestAmount": null
-        },
-        {
           "id": 168,
           "date": "2026-03-17",
           "amount": 270,
