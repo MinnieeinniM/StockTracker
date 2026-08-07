@@ -363,7 +363,17 @@
           "operator": "媽"
         }
       ],
-      "dividends": [],
+      "dividends": [
+        {
+          "id": 215,
+          "date": "2026-07-31",
+          "amount": 17900,
+          "note": "",
+          "broker": "新光",
+          "operator": "媽",
+          "reinvestAmount": null
+        }
+      ],
       "currentPrice": 237,
       "annualDividend": 7.2,
       "priceUpdated": "2026/7/29 20:04:45",
@@ -2035,6 +2045,6 @@
       "priceUpdated": "2026/7/29 20:04:45"
     }
   },
-  "nextId": 215,
+  "nextId": 216,
   "_saved": true
 }
