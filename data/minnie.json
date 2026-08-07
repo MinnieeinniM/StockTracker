@@ -1259,7 +1259,17 @@
           "operator": "媽"
         }
       ],
-      "dividends": [],
+      "dividends": [
+        {
+          "id": 222,
+          "date": "2026-08-07",
+          "amount": 1190,
+          "note": "",
+          "broker": "永豐",
+          "operator": "我",
+          "reinvestAmount": null
+        }
+      ],
       "currentPrice": 61.7,
       "annualDividend": 1.2,
       "priceUpdated": "2026/7/29 20:04:45",
@@ -2108,6 +2118,6 @@
       "priceUpdated": "2026/7/29 20:04:45"
     }
   },
-  "nextId": 222,
+  "nextId": 223,
   "_saved": true
 }
