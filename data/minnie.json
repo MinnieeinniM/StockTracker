@@ -1384,7 +1384,17 @@
           "sellIncome": 12961
         }
       ],
-      "dividends": [],
+      "dividends": [
+        {
+          "id": 228,
+          "date": "2026-08-14",
+          "amount": 1923,
+          "note": "",
+          "broker": "新光",
+          "operator": "媽",
+          "reinvestAmount": null
+        }
+      ],
       "currentPrice": 68.8,
       "annualDividend": 0,
       "priceUpdated": "2026/8/12 17:41:53",
@@ -2149,6 +2159,6 @@
       "priceUpdated": "2026/8/12 17:41:53"
     }
   },
-  "nextId": 228,
+  "nextId": 229,
   "_saved": true
 }
