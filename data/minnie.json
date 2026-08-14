@@ -2023,6 +2023,15 @@
           "broker": "永豐",
           "operator": "我",
           "reinvestAmount": null
+        },
+        {
+          "id": 231,
+          "date": "2026-08-10",
+          "amount": 2654,
+          "note": "",
+          "broker": "永豐",
+          "operator": "我",
+          "reinvestAmount": 2560
         }
       ],
       "currentPrice": 106.4,
@@ -2186,6 +2195,6 @@
       "priceUpdated": "2026/8/14 19:19:44"
     }
   },
-  "nextId": 231,
+  "nextId": 232,
   "_saved": true
 }
