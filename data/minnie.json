@@ -85,6 +85,24 @@
       "priceUpdated": "2026/8/12 17:41:53",
       "per": 214.32
     },
+    "1785": {
+      "name": "光洋科",
+      "lots": [
+        {
+          "id": 229,
+          "date": "2026-08-14",
+          "type": "buy",
+          "shares": 1000,
+          "total": 105042,
+          "broker": "新光",
+          "operator": "媽"
+        }
+      ],
+      "dividends": [],
+      "currentPrice": 0,
+      "annualDividend": 0,
+      "priceUpdated": ""
+    },
     "1802": {
       "name": "台玻",
       "lots": [
@@ -2159,6 +2177,6 @@
       "priceUpdated": "2026/8/12 17:41:53"
     }
   },
-  "nextId": 229,
+  "nextId": 230,
   "_saved": true
 }
