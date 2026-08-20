@@ -674,6 +674,24 @@
       "priceUpdated": "2026/8/17 12:33:56",
       "per": 18.9
     },
+    "2428": {
+      "name": "興勤",
+      "lots": [
+        {
+          "id": 239,
+          "date": "2026-08-18",
+          "type": "buy",
+          "shares": 1000,
+          "total": 253602,
+          "broker": "新光",
+          "operator": "媽"
+        }
+      ],
+      "dividends": [],
+      "currentPrice": 0,
+      "annualDividend": 0,
+      "priceUpdated": ""
+    },
     "2441": {
       "name": "超豐",
       "lots": [
@@ -2250,6 +2268,6 @@
       "priceUpdated": "2026/8/17 12:33:56"
     }
   },
-  "nextId": 239,
+  "nextId": 240,
   "_saved": true
 }
