@@ -785,6 +785,15 @@
           "total": 14345,
           "broker": "永豐",
           "operator": "我"
+        },
+        {
+          "id": 241,
+          "date": "2026-08-20",
+          "type": "buy",
+          "shares": 2,
+          "total": 0,
+          "broker": "永豐",
+          "operator": "我"
         }
       ],
       "dividends": [],
@@ -2277,6 +2286,6 @@
       "priceUpdated": "2026/8/17 12:33:56"
     }
   },
-  "nextId": 241,
+  "nextId": 242,
   "_saved": true
 }
