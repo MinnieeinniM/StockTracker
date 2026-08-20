@@ -1429,6 +1429,15 @@
           "broker": "新光",
           "operator": "媽",
           "reinvestAmount": null
+        },
+        {
+          "id": 236,
+          "date": "2026-08-14",
+          "amount": 1923,
+          "note": "",
+          "broker": "新光",
+          "operator": "媽",
+          "reinvestAmount": null
         }
       ],
       "currentPrice": 67,
@@ -2232,6 +2241,6 @@
       "priceUpdated": "2026/8/17 12:33:56"
     }
   },
-  "nextId": 236,
+  "nextId": 237,
   "_saved": true
 }
