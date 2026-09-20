@@ -1073,7 +1073,17 @@
           "operator": "我"
         }
       ],
-      "dividends": [],
+      "dividends": [
+        {
+          "id": 255,
+          "date": "2026-09-20",
+          "amount": 405,
+          "note": "",
+          "broker": "永豐",
+          "operator": "我",
+          "reinvestAmount": null
+        }
+      ],
       "currentPrice": 6430,
       "annualDividend": 0,
       "priceUpdated": "2026/9/20 16:15:41",
@@ -2427,6 +2437,6 @@
       "priceUpdated": "2026/9/20 16:15:41"
     }
   },
-  "nextId": 255,
+  "nextId": 256,
   "_saved": true
 }
