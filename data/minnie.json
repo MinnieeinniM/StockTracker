@@ -1996,6 +1996,24 @@
       "priceUpdated": "2026/9/20 16:12:25",
       "per": 21.76
     },
+    "8210": {
+      "name": "勤誠",
+      "lots": [
+        {
+          "id": 251,
+          "date": "2026-09-18",
+          "type": "buy",
+          "shares": 50,
+          "total": 45414,
+          "broker": "永豐",
+          "operator": "咘"
+        }
+      ],
+      "dividends": [],
+      "currentPrice": 0,
+      "annualDividend": 0,
+      "priceUpdated": ""
+    },
     "8261": {
       "name": "富鼎",
       "lots": [
@@ -2380,6 +2398,6 @@
       "priceUpdated": "2026/9/20 16:12:25"
     }
   },
-  "nextId": 251,
+  "nextId": 252,
   "_saved": true
 }
