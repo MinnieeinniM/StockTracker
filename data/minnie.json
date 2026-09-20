@@ -1752,6 +1752,24 @@
       "priceUpdated": "2026/9/7 22:31:02",
       "per": 21.71
     },
+    "6274": {
+      "name": "台燿",
+      "lots": [
+        {
+          "id": 249,
+          "date": "2026-09-10",
+          "type": "buy",
+          "shares": 100,
+          "total": 135555,
+          "broker": "新光",
+          "operator": "媽"
+        }
+      ],
+      "dividends": [],
+      "currentPrice": 0,
+      "annualDividend": 0,
+      "priceUpdated": ""
+    },
     "6279": {
       "name": "胡連",
       "lots": [
@@ -2353,6 +2371,6 @@
       "priceUpdated": "2026/9/7 22:31:02"
     }
   },
-  "nextId": 249,
+  "nextId": 250,
   "_saved": true
 }
