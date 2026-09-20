@@ -361,6 +361,15 @@
           "total": 136555,
           "broker": "新光",
           "operator": "媽"
+        },
+        {
+          "id": 248,
+          "date": "2026-09-09",
+          "type": "sell",
+          "shares": 1000,
+          "total": 143012,
+          "broker": "新光",
+          "operator": "媽"
         }
       ],
       "dividends": [],
@@ -2344,6 +2353,6 @@
       "priceUpdated": "2026/9/7 22:31:02"
     }
   },
-  "nextId": 248,
+  "nextId": 249,
   "_saved": true
 }
