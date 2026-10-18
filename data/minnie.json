@@ -1615,6 +1615,24 @@
       "priceUpdated": "2026/9/20 16:15:41",
       "per": 28.63
     },
+    "6197": {
+      "name": "佳必琪",
+      "lots": [
+        {
+          "id": 266,
+          "date": "2026-10-02",
+          "type": "buy",
+          "shares": 1000,
+          "total": 333133,
+          "broker": "新光",
+          "operator": "媽"
+        }
+      ],
+      "dividends": [],
+      "currentPrice": 0,
+      "annualDividend": 0,
+      "priceUpdated": ""
+    },
     "6213": {
       "name": "聯茂",
       "lots": [
@@ -2520,6 +2538,6 @@
       "priceUpdated": "2026/9/20 16:15:41"
     }
   },
-  "nextId": 266,
+  "nextId": 267,
   "_saved": true
 }
