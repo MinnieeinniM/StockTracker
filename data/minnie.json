@@ -536,6 +536,15 @@
           "total": 23475,
           "broker": "阿母",
           "operator": "媽"
+        },
+        {
+          "id": 261,
+          "date": "2026-10-15",
+          "type": "buy",
+          "shares": 100,
+          "total": 59084,
+          "broker": "永豐",
+          "operator": "咘"
         }
       ],
       "dividends": [],
@@ -2474,6 +2483,6 @@
       "priceUpdated": "2026/9/20 16:15:41"
     }
   },
-  "nextId": 261,
+  "nextId": 262,
   "_saved": true
 }
