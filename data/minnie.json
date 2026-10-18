@@ -2047,6 +2047,15 @@
           "total": 45414,
           "broker": "永豐",
           "operator": "咘"
+        },
+        {
+          "id": 259,
+          "date": "2026-09-18",
+          "type": "buy",
+          "shares": 50,
+          "total": 45414,
+          "broker": "永豐",
+          "operator": "咘"
         }
       ],
       "dividends": [],
@@ -2465,6 +2474,6 @@
       "priceUpdated": "2026/9/20 16:15:41"
     }
   },
-  "nextId": 259,
+  "nextId": 260,
   "_saved": true
 }
